@@ -33,24 +33,35 @@ function option(value: string, label: string, current: string) {
   return `<option value="${escapeHtml(value)}"${value === current ? ' selected' : ''}>${escapeHtml(label)}</option>`;
 }
 
-export function casesScreen(game: GameState) {
+export function casesScreen(game: GameState, canOpenPaidCase: boolean) {
   const free = game.progress.casesOpened === 0;
+  const canOpen = free || canOpenPaidCase;
   return `<section class="case-screen" aria-labelledby="screen-title">
-    ${pageHeading('CASE OPENER', 'Cases', 'Open a case, build your garage and find your next race winner.')}
+    <header class="case-header">
+      <h1 id="screen-title" tabindex="-1">Cases</h1>
+      <dl class="case-stats" aria-label="Your progress">
+        <div><dt>In garage</dt><dd>${game.garage.length}</dd></div>
+        <div><dt>Cases opened</dt><dd>${game.progress.casesOpened}</dd></div>
+        <div><dt>Races finished</dt><dd>${game.progress.racesCompleted}</dd></div>
+      </dl>
+    </header>
     <div class="case-grid">
-      <article class="case-feature panel">
-        <div class="case-art">${carImage(featuredCar, true)}</div>
-        <div class="case-content">
-          <div class="badges">${free ? '<span class="status-badge">FIRST CASE FREE</span>' : ''}</div>
-          <h2>Rookie Case</h2>
-          <p>From budget builds to exotic machines. Every pull adds a car to your garage.</p>
-          <div class="button-row">
-            <button type="button" class="button button-primary" data-action="open-case"${!free && game.coins < economy.casePrice ? ' disabled' : ''}>
-              ${icon('cases')} ${free ? 'Open Free Case' : 'Open Case'}
-            </button>
-            <span class="case-price">${icon('coin')} ${free ? 'Free' : `${money(economy.casePrice)} coins`}</span>
+      <article class="case-feature panel" aria-labelledby="rookie-case-title">
+        <div class="case-stage" aria-hidden="true">
+          <div class="case-crate">
+            <span class="case-crate-lid"></span>
+            <span class="case-crate-face">
+              <span class="case-crate-plate">${icon('logo')}</span>
+            </span>
           </div>
-          ${!free && game.coins < economy.casePrice ? '<p class="action-hint">Race to earn more coins.</p>' : ''}
+        </div>
+        <div class="case-content">
+          <h2 id="rookie-case-title">Rookie Case</h2>
+          <button type="button" class="button button-primary case-open-button" data-action="open-case"${free ? '' : ' aria-describedby="rookie-case-price"'}${canOpen ? '' : ' disabled'}>
+            ${icon('cases')} ${free ? 'Open Free Case' : 'Open Case'}
+          </button>
+          ${free ? '' : `<span class="case-price" id="rookie-case-price">${icon('coin')} ${money(economy.casePrice)} coins</span>`}
+          ${canOpen ? '' : '<p class="action-hint">Race to earn more coins.</p>'}
         </div>
       </article>
       <aside class="case-sidebar">
@@ -59,20 +70,22 @@ export function casesScreen(game: GameState) {
           ${oddsTable(free ? starterOdds : rookieOdds)}
           <p class="odds-note">Cars have equal odds within each rarity.</p>
         </section>
-        <section class="progress-panel panel" aria-labelledby="progress-title">
-          <div class="panel-heading"><h2 id="progress-title">Your progress</h2></div>
-          <dl class="progress-list">
-            <div><dt>In garage</dt><dd>${game.garage.length}</dd></div>
-            <div><dt>Cases opened</dt><dd>${game.progress.casesOpened}</dd></div>
-            <div><dt>Races finished</dt><dd>${game.progress.racesCompleted}</dd></div>
-          </dl>
+        <section class="case-preview panel" aria-labelledby="case-preview-title">
+          <div class="case-preview-art">${carImage(featuredCar)}</div>
+          <div class="case-preview-details">
+            <p id="case-preview-title">Featured drop</p>
+            <h2>${escapeHtml(featuredCar.name)}</h2>
+            ${rarityBadge(featuredCar.rarity)}
+          </div>
         </section>
       </aside>
     </div>
-    <section class="catalog-section" aria-labelledby="pool-title">
-      <div class="section-heading"><div><h2 id="pool-title">Vehicle Pool</h2><p>The cars available in the Rookie Case.</p></div><span>${cars.length} vehicles</span></div>
+    <details class="catalog-section panel">
+      <summary class="catalog-summary">
+        ${icon('garage')} <strong>Vehicle Pool</strong><span>${cars.length} vehicles</span>
+      </summary>
       <div class="card-grid">${cars.map((car) => carCard(car)).join('')}</div>
-    </section>
+    </details>
   </section>`;
 }
 

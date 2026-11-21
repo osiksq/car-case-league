@@ -202,9 +202,9 @@ function parseSave(raw: string | null): unknown {
   }
 }
 
-export function readSave(storage: Pick<Storage, 'getItem'>): GameState {
+export function readSave(storage: Pick<Storage, 'getItem'>, key = storageKey): GameState {
   try {
-    const value = parseSave(storage.getItem(storageKey));
+    const value = parseSave(storage.getItem(key));
     if (!isSave(value)) return createGame();
     return value.pendingRace ? { ...value, pendingRace: value.races.at(-1) ?? null } : value;
   } catch {
@@ -212,10 +212,14 @@ export function readSave(storage: Pick<Storage, 'getItem'>): GameState {
   }
 }
 
-export function writeSave(storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, 'getItem'>>, state: GameState): void {
-  const existing = parseSave(storage.getItem?.(storageKey) ?? null);
+export function writeSave(
+  storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, 'getItem'>>,
+  state: GameState,
+  key = storageKey,
+): void {
+  const existing = parseSave(storage.getItem?.(key) ?? null);
   if (isObject(existing) && isCount(existing.version) && existing.version > saveVersion) {
     throw new Error('This save belongs to a newer version of Car Case League.');
   }
-  storage.setItem(storageKey, JSON.stringify(state));
+  storage.setItem(key, JSON.stringify(state));
 }
