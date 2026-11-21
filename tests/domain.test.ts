@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { cars, economy, events, rarities, rookieOdds, starterOdds, stats, tacticModifiers } from '../src/game/config';
+import { cars, economy, events, rarities, stats, tacticModifiers } from '../src/game/config';
+import { buildCaseReel, caseIds, casePool, casePrice, cases } from '../src/game/cases';
 import {
   createGame,
   finishCase,
@@ -23,21 +24,22 @@ function memoryStorage() {
 }
 
 function starter() {
-  return finishCase(openCase(createGame(), 12), 'keep');
+  return finishCase(openCase(createGame(), 'rookie', 12), 'keep');
 }
 
 describe('Rookie Case', () => {
   it('grants one selected starter for free and rejects a second case before a race', () => {
     const fresh = createGame();
-    const opened = openCase(fresh, 12);
+    const opened = openCase(fresh, 'rookie', 12);
 
     expect(opened.coins).toBe(fresh.coins);
     expect(opened.garage).toHaveLength(1);
     expect(opened.selectedId).toBe(opened.garage[0].id);
     expect(opened.pendingCase).toBe(opened.garage[0].id);
+    expect(opened.pendingCaseType).toBe('rookie');
     expect(fresh.garage).toEqual([]);
-    expect(() => openCase(opened, 12)).toThrow();
-    expect(() => openCase(finishCase(opened, 'keep'), 12)).toThrow(/coins/i);
+    expect(() => openCase(opened, 'rookie', 12)).toThrow();
+    expect(() => openCase(finishCase(opened, 'keep'), 'rookie', 12)).toThrow(/coins/i);
   });
 
   it('offers a second case after the first race even on a loss', () => {
@@ -47,46 +49,125 @@ describe('Rookie Case', () => {
     expect(loss).toBeDefined();
     if (!loss) throw new Error('Expected at least one loss in the seeded fixtures');
 
-    const opened = openCase(finishRace(loss), 12);
+    const opened = openCase(finishRace(loss), 'rookie', 12);
     expect(loss.pendingRace?.reward).toBe(economy.lossReward);
-    expect(opened.coins).toBe(loss.coins - economy.casePrice);
+    expect(opened.coins).toBe(loss.coins - cases.rookie.price);
     expect(opened.coins).toBeGreaterThanOrEqual(0);
     expect(opened.garage).toHaveLength(2);
   });
 
-  it('draws seeded rewards across the published odds with a populated pool in every tier', () => {
-    const sampleCount = 20_000;
-    const counts: Record<string, number> = Object.fromEntries(rarities.map((rarity) => [rarity, 0]));
-    const catalog = new Map(cars.map((car) => [car.id, car]));
-    const state = { ...starter(), coins: economy.casePrice };
+  it('charges other cases even before opening the first Rookie', () => {
+    expect(casePrice('rookie', 0)).toBe(0);
+    expect(casePrice('street', 0)).toBe(240);
+    expect(casePrice('performance', 0)).toBe(420);
+    expect(casePrice('elite', 0)).toBe(700);
+    expect(() => openCase(createGame(), 'street', 12)).toThrow(/coins/i);
+    expect(casePrice('rookie', 1)).toBe(120);
+  });
+});
+
+describe('case odds and visual reels', () => {
+  const publishedOdds = {
+    rookie: [70, 25, 5, 0, 0, 0],
+    street: [35, 45, 18, 2, 0, 0],
+    performance: [0, 25, 45, 26, 4, 0],
+    elite: [0, 0, 20, 55, 24, 1],
+  };
+
+  it('defines four distinct vehicle pools and exact odds totaling 100% each', () => {
+    expect(caseIds).toEqual(['rookie', 'street', 'performance', 'elite']);
+    const pools = caseIds.map((id) => casePool(id).map((car) => car.id).sort().join(','));
+    expect(new Set(pools).size).toBe(4);
+    for (const id of caseIds) {
+      const odds = rarities.map((rarity) => cases[id].odds[rarity]);
+      expect(odds).toEqual(publishedOdds[id]);
+      expect(odds.reduce((total, weight) => total + weight, 0)).toBe(100);
+      const eligibleRarities = rarities.filter((_, index) => odds[index] > 0);
+      expect(new Set(casePool(id).map((car) => car.rarity))).toEqual(new Set(eligibleRarities));
+    }
+  });
+
+  it.each(['rookie', 'street', 'performance', 'elite'] as const)('%s draws only eligible vehicles at its real odds', (id) => {
+    const sampleCount = 12_000;
+    const counts = Object.fromEntries(rarities.map((rarity) => [rarity, 0]));
+    const pool = new Map(casePool(id).map((car) => [car.id, car]));
+    const state = { ...starter(), coins: cases[id].price };
+
     for (let seed = 0; seed < sampleCount; seed++) {
-      const reward = openCase(state, seed).garage.at(-1);
-      const car = reward && catalog.get(reward.carId);
-      if (!car) throw new Error('Missing case reward');
+      const reward = openCase(state, id, seed).garage.at(-1);
+      const car = reward && pool.get(reward.carId);
+      if (!car) throw new Error(`Ineligible ${id} case reward: ${reward?.carId}`);
       counts[car.rarity]++;
     }
 
-    expect(Object.values(starterOdds).reduce((total, odds) => total + odds, 0)).toBeCloseTo(100);
-    expect(Object.values(rookieOdds).reduce((total, odds) => total + odds, 0)).toBeCloseTo(100);
-    for (const rarity of rarities) {
-      const expected = (rookieOdds[rarity] / 100) * sampleCount;
-      expect(counts[rarity]).toBeGreaterThan(0);
-      expect(Math.abs(counts[rarity] - expected)).toBeLessThan(5 * Math.sqrt(expected));
+    for (const [index, rarity] of rarities.entries()) {
+      const expected = publishedOdds[id][index] * sampleCount / 100;
+      if (expected === 0) {
+        expect(counts[rarity]).toBe(0);
+      } else {
+        expect(counts[rarity]).toBeGreaterThan(0);
+        expect(Math.abs(counts[rarity] - expected)).toBeLessThan(5 * Math.sqrt(expected));
+      }
     }
+  });
+
+  it('pins the actual reward and limits scarce fillers to eligible cars away from the marker', () => {
+    for (const id of caseIds) {
+      const pool = casePool(id);
+      const allowed = new Set(pool.map((car) => car.id));
+      for (const reward of pool) {
+        let reelsWithoutMythicFiller = 0;
+        let mostLikelyFillers = 0;
+        let totalFillers = 0;
+        const dominant = rarities.reduce((best, rarity) => cases[id].odds[rarity] > cases[id].odds[best] ? rarity : best);
+        for (let seed = 0; seed < 48; seed++) {
+          const reel = buildCaseReel(id, reward, seed);
+          expect(reel.entries[reel.winnerIndex]).toBe(reward);
+          expect(reel.winnerIndex).toBeGreaterThanOrEqual(20);
+          expect(reel.entries.length - reel.winnerIndex - 1).toBeGreaterThanOrEqual(5);
+          expect(reel.entries.every((car) => allowed.has(car.id))).toBe(true);
+          const fillers = reel.entries.filter((_, index) => index !== reel.winnerIndex);
+          const mythics = fillers.filter((car) => car.rarity === 'Mythic');
+          expect(mythics.length).toBeLessThanOrEqual(1);
+          expect(fillers.filter((car) => car.rarity === 'Legendary').length).toBeLessThanOrEqual(2);
+          if (mythics.length === 0) reelsWithoutMythicFiller++;
+          mostLikelyFillers += fillers.filter((car) => car.rarity === dominant).length;
+          totalFillers += fillers.length;
+          for (const neighbor of [reel.entries[reel.winnerIndex - 1], reel.entries[reel.winnerIndex + 1]]) {
+            expect(['Legendary', 'Mythic']).not.toContain(neighbor.rarity);
+          }
+        }
+        expect(reelsWithoutMythicFiller).toBeGreaterThan(24);
+        expect(mostLikelyFillers / totalFillers).toBeGreaterThan(0.4);
+        expect(buildCaseReel(id, reward, 12)).toEqual(buildCaseReel(id, reward, 12));
+      }
+    }
+  });
+
+  it('lets Legendary fillers appear in some Elite reels and keeps them out of others', () => {
+    const reward = casePool('elite').find((car) => car.rarity === 'Epic');
+    if (!reward) throw new Error('Expected an Epic Elite reward');
+    const sampleCount = 64;
+    const reelsWithLegendary = Array.from({ length: sampleCount }, (_, seed) => (
+      buildCaseReel('elite', reward, seed).entries.some((car) => car.rarity === 'Legendary')
+    )).filter(Boolean).length;
+
+    expect(reelsWithLegendary).toBeGreaterThan(sampleCount / 5);
+    expect(sampleCount - reelsWithLegendary).toBeGreaterThan(sampleCount / 5);
   });
 });
 
 describe('garage', () => {
   it('protects the last car through both sale paths', () => {
-    const game = openCase(createGame(), 12);
+    const game = openCase(createGame(), 'rookie', 12);
     expect(() => finishCase(game, 'sell')).toThrow(/last car/i);
     const kept = finishCase(game, 'keep');
     expect(() => sellCar(kept, kept.garage[0].id)).toThrow(/last car/i);
   });
 
   it('honors a lock and reselects the remaining car when the selected car is sold', () => {
-    const game = { ...starter(), coins: economy.casePrice };
-    const twoCars = finishCase(openCase(game, 12), 'keep');
+    const game = { ...starter(), coins: cases.rookie.price };
+    const twoCars = finishCase(openCase(game, 'rookie', 12), 'keep');
     const [first, second] = twoCars.garage;
     const selected = selectCar(twoCars, second.id);
     const locked = toggleLock(selected, second.id);
@@ -186,16 +267,47 @@ describe('races', () => {
 describe('versioned progress', () => {
   it('restores the pending case and its already acquired car in one snapshot', () => {
     const storage = memoryStorage();
-    const paid = { ...starter(), coins: economy.casePrice };
-    writeSave(storage, openCase(paid, 101));
+    const paid = { ...starter(), coins: cases.elite.price };
+    writeSave(storage, openCase(paid, 'elite', 101));
 
     const restored = readSave(storage);
     expect(restored.coins).toBe(0);
     expect(restored.garage).toHaveLength(2);
     expect(restored.garage.at(-1)?.id).toBe(restored.pendingCase);
+    expect(restored.pendingCaseType).toBe('elite');
     const accepted = finishCase(restored, 'keep');
+    expect(accepted.pendingCaseType).toBeUndefined();
     writeSave(storage, accepted);
     expect(finishCase(readSave(storage), 'keep')).toEqual(accepted);
+  });
+
+  it('keeps a legacy Rookie save with a pending car outside the current Rookie pool', () => {
+    const storage = memoryStorage();
+    const previous = {
+      ...createGame(),
+      garage: [{ id: 'car-1', carId: 'veldris-zenith', locked: true }],
+      selectedId: 'car-1',
+      coins: 260,
+      progress: { casesOpened: 1, racesCompleted: 0 },
+      pendingCase: 'car-1',
+    };
+    storage.setItem(storageKey, JSON.stringify(previous));
+    const restored = readSave(storage);
+    expect(restored).toEqual(previous);
+    expect(finishCase(restored, 'keep').garage).toEqual(previous.garage);
+  });
+
+  it('discards unknown case display metadata without losing the pending car or wallet', () => {
+    const storage = memoryStorage();
+    const opened = openCase({ ...starter(), coins: cases.elite.price + 40 }, 'elite', 101);
+    storage.setItem(storageKey, JSON.stringify({ ...opened, pendingCaseType: 'unknown-case' }));
+
+    const restored = readSave(storage);
+    expect(restored.pendingCaseType).toBeUndefined();
+    expect(restored.pendingCase).toBe(opened.pendingCase);
+    expect(restored.garage).toEqual(opened.garage);
+    expect(restored.coins).toBe(40);
+    expect(finishCase(restored, 'keep').garage).toEqual(opened.garage);
   });
 
   it('keeps a single race reward when reload interrupts the pending result', () => {

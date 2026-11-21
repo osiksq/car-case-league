@@ -24,22 +24,9 @@ export interface Car {
 
 export const economy = {
   startingCoins: 60,
-  casePrice: 120,
   winReward: 100,
   lossReward: 60,
 };
-
-export const rookieOdds: Record<Rarity, number> = {
-  Common: 63,
-  Uncommon: 25,
-  Rare: 9,
-  Epic: 2,
-  Legendary: 0.8,
-  Mythic: 0.2,
-};
-
-// Every car in the Rookie pool is eligible for both Alpha race types.
-export const starterOdds = rookieOdds;
 
 export const events: Record<EventId, { name: string; description: string; weights: CarStats }> = {
   drag: {

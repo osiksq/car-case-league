@@ -93,7 +93,7 @@ test('layout fits the viewport including on mobile', async ({ page }) => {
   await expect(pool).toHaveJSProperty('open', false);
   await pool.locator('summary').click();
   await expect(pool).toHaveJSProperty('open', true);
-  await expect(pool.locator('article')).toHaveCount(12);
+  await expect(pool.locator('article')).toHaveCount(6);
   await pool.locator('article').last().scrollIntoViewIfNeeded();
   await expect(page.getByTestId('coin-balance')).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(

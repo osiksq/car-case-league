@@ -29,25 +29,27 @@ Common covers older or budget vehicles. Mythic covers the most prestigious moder
 
 My Garage supports sorting and filters, inspection of all four stats, selection for races, locking, and sale. Locked cars and the last race-eligible car cannot be sold. If the selected car is sold, another owned car becomes selected. Duplicate models are allowed.
 
-## 3. Rookie Case and economy
+## 3. Case lineup and economy
 
-Rookie is the only Alpha case. The first opening is free and uses the same table as subsequent openings. Every catalog car is eligible for both Alpha races. Roll for rarity and then choose uniformly within the tier. The odds are visible before purchase.
+Alpha offers four cases. Every case has a separate vehicle pool. Roll for rarity using the selected case's table and then choose uniformly among its vehicles in that tier. The odds are visible before purchase. The first opening is free when the player chooses Rookie. Every catalog car is eligible for both Alpha races.
 
-| Common | Uncommon | Rare | Epic | Legendary | Mythic |
-|---:|---:|---:|---:|---:|---:|
-| 63% | 25% | 9% | 2% | 0.8% | 0.2% |
+| Case | Price (coins) | Common | Uncommon | Rare | Epic | Legendary | Mythic |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Rookie | 120 | 70% | 25% | 5% | 0% | 0% | 0% |
+| Street | 240 | 35% | 45% | 18% | 2% | 0% | 0% |
+| Performance | 420 | 0% | 25% | 45% | 26% | 4% | 0% |
+| Elite | 700 | 0% | 0% | 20% | 55% | 24% | 1% |
 
-Select and persist the reward before the horizontal roulette starts. Cards move right to left, decelerate, and stop on the selected car. Skip reveals the same result immediately. The result offers Keep, Sell, and Go to Garage. Sale uses the garage's protection rules.
+Select and persist the reward before constructing the horizontal reel. The visual cards come from the selected case's pool and favor its common outcomes. Legendary and Mythic filler appearances are limited and kept away from the marker's neighboring slots at the stop. The reel illustrates the opening. The published table governs the actual draw. Cards move right to left, decelerate, and stop on the selected car. Skip reveals the same result immediately. The result offers Keep, Sell, and Go to Garage. Sale uses the garage's protection rules.
 
 | Temporary Alpha value | Coins |
 |---|---:|
 | Starting wallet | 60 |
-| Subsequent Rookie Case | 120 |
 | Race entry | 0 |
 | Win | 100 |
 | Loss | 60 |
 
-Either outcome of the first race funds a second case without selling the starter car. Prices, payouts, resale values, and probabilities are configurable and pending balance review.
+Either outcome of the first race funds a second Rookie Case without selling the starter car. The four prices are temporary and configurable. Local development can waive the price of any case with Infinite Money.
 
 ## 4. Races
 
@@ -80,6 +82,6 @@ TypeScript owns game rules and state. Vite builds the static application, and HT
 
 ## 7. Deferred decisions
 
-Championships, complex tuning, multiplayer, ads, and payments are outside Alpha. Further cases, weather and endurance races, class-restricted events, and larger catalogs are candidates for later design review.
+Championships, complex tuning, multiplayer, ads, and payments are outside Alpha. Weather and endurance races, class-restricted events, and larger catalogs are candidates for later design review.
 
 Session length, onboarding completion, and return rates remain design hypotheses. Validate release constraints and metrics before any CrazyGames submission. See the [Basic Launch guide](https://docs.crazygames.com/resources/basic-launch-metrics/) and [technical requirements](https://docs.crazygames.com/requirements/technical/).
