@@ -1,160 +1,85 @@
 # Car Case League — Game Design Document
 
-**Status:** Draft v0.1 — pre-production, 21 November 2026  
-**Platform:** Browser (desktop first, responsive mobile)  
-**Genre:** Car collecting + virtual case opening + tactical auto-racing  
-**Audience:** International casual browser players; English-first  
-**Target session:** >=10 min as a design hypothesis, to be tested (not guaranteed)
+- **Version:** 0.2 · Alpha 0.1
+- **Platform:** Desktop and mobile web
+- **Audience:** Casual browser players · English interface
 
-## 1. Elevator pitch
+## 1. Product direction
 
-Open virtual car cases, build a diverse garage and choose the right car for different automated race events. Winning requires both a growing collection and smart decisions — a supercar will not automatically beat a cheaper specialist on every track.
+Open virtual car cases, build a varied garage, and compete in short tactical auto races. The right car and tactic for an event matter alongside rarity. The first session takes the player from a free case to a race and a second case.
 
-**Unique hook:** Cars from cases are useful in a lightweight strategic racing league. Car selection, track requirements and a small amount of tuning matter more than rarity alone.
+Use a dark, premium automotive interface with large cards, restrained transitions, and semi-realistic three-quarter vehicle artwork. All vehicles and names are original fictional creations. Alpha uses generated placeholder artwork. Review artwork, names, and applicable platform and content requirements before a public launch.
 
-## 2. Product principles
+Coins are earned in-game. The game has no coin purchases, real-money rewards, betting, transfers, or cash-out.
 
-1. **First action within seconds:** the tutorial gives the player a free starter case; no registration.
-2. **Choices beat pure randomness:** the outcome of a race should be explainable from car stats, event conditions and tactics.
-3. **Low art and development cost:** 2D illustrated/stylized original vehicle art and animated UI, not a physics-based 3D driving game.
-4. **Collection with purpose:** ordinary cars can be useful for niche events, class limits, or collection challenges.
-5. **No real-money loot boxes:** all cases use only earnable, non-purchasable in-game coins. No cash-out, betting, peer-to-peer trading or real-money monetary value. Do not launch without a fresh platform-policy and legal review.
-6. **IP safety:** fictional manufacturers, unique names, original silhouettes/art. Do not use real automaker logos or unlicensed game assets.
+## 2. Vehicle catalog and garage
 
-## 3. Core gameplay loop
+Alpha contains 12 unique vehicles. Each model has a name, artwork, resale value, class, rarity, and four integer stats from 1 to 100: Speed, Acceleration, Handling, and Reliability. Owned copies have their own identity and lock status.
 
-1. Pick a case, preview possible rewards and published probabilities, spend earned coins.
-2. Open it with a short optional-to-skip reveal animation; collect a car in the garage.
-3. Compare available racing events and expected track requirements.
-4. Choose a suitable car and one of three tactics (Safe / Balanced / Push).
-5. Watch a short 15–25-second auto-race, with progress and clear causal feedback.
-6. Receive race coins, league points and milestone progression, including after losses.
-7. Upgrade a favored car, sell duplicates, unlock new classes/cases; repeat.
+| Rarity | Color |
+|---|---|
+| Common | Gray |
+| Uncommon | Green |
+| Rare | Blue |
+| Epic | Purple |
+| Legendary | Gold |
+| Mythic | Red |
 
-**First-session aspiration (10 min):** open starter case -> race -> open second case -> compare cars -> win a different track -> make first upgrade -> unlock the next goal. Instrument the actual funnel before tuning for session length.
+Common covers older or budget vehicles. Mythic covers the most prestigious modern hypercars. All rarity tiers have text labels. The classes are Street, Sport, Muscle, Track, Exotic, Classic, and Collector. Collector uses black carbon styling and retains its rarity label and accent.
 
-## 4. Core systems
+My Garage supports sorting and filters, inspection of all four stats, selection for races, locking, and sale. Locked cars and the last race-eligible car cannot be sold. If the selected car is sold, another owned car becomes selected. Duplicate models are allowed.
 
-### 4.1 Cars
+## 3. Rookie Case and economy
 
-Each car has:
-- `id`, fictional `brand`, `model`, visual asset, `rarity`, `class`, `resaleValue`
-- Four integer stats (1–100): `speed`, `acceleration`, `handling`, `reliability`
-- Ownership state, optional upgrade levels, acquisition timestamp.
+Rookie is the only Alpha case. The first opening is free and uses the same table as subsequent openings. Every catalog car is eligible for both Alpha races. Roll for rarity and then choose uniformly within the tier. The odds are visible before purchase.
 
-Five rarity tiers: Common, Uncommon, Rare, Epic, Legendary. **Rarity != automatic race superiority.** Class-restricted events and track types preserve the usefulness of modest cars.
+| Common | Uncommon | Rare | Epic | Legendary | Mythic |
+|---:|---:|---:|---:|---:|---:|
+| 63% | 25% | 9% | 2% | 0.8% | 0.2% |
 
-Original, visually distinctive names: e.g. **Volterra Sprint**, **Nordfox GT**, **Altair V12**, **Kepler R**, **Ridgeback XR**. These are working examples and must be checked for name collisions before release.
+Select and persist the reward before the horizontal roulette starts. Cards move right to left, decelerate, and stop on the selected car. Skip reveals the same result immediately. The result offers Keep, Sell, and Go to Garage. Sale uses the garage's protection rules.
 
-### 4.2 Case opening
+| Temporary Alpha value | Coins |
+|---|---:|
+| Starting wallet | 60 |
+| Subsequent Rookie Case | 120 |
+| Race entry | 0 |
+| Win | 100 |
+| Loss | 60 |
 
-Case categories for eventual v1:
+Either outcome of the first race funds a second case without selling the starter car. Prices, payouts, resale values, and probabilities are configurable and pending balance review.
 
-| Case | Draft coin price | Intended reward distribution (prototype only) | Unlock |
-|---|---:|---|---|
-| Rookie | 120 | Common 65%, Uncommon 25%, Rare 9%, Epic 1% | Start |
-| Street | 450 | Common 25%, Uncommon 55%, Rare 17%, Epic 3% | League progression |
-| Elite | 1400 | Uncommon 30%, Rare 55%, Epic 14%, Legendary 1% | Later league |
+## 4. Races
 
-The percentages are **initial design guesses**, not measured optimums. Present clear odds in the UI, and test the expected resale value and player earning rate to prevent broken economies. All coin values are fictional. No IAP or coin purchasing.
+Select an owned car and a tactic before entering a one-on-one auto race. Safe favors reliability at a cost to speed, Balanced uses base performance, and Push increases speed and acceleration at the cost of handling and reliability.
 
-Cases reveal 3–5 showcase candidates/roulette visuals but select the result through the audited probability table at open time, independent of animation speed. Provide a skip button. No deceptive near-miss effects or forced ad views.
-
-### 4.3 Racing
-
-**Not a driving simulator:** short asynchronous single-player match against 1–3 generated opponents. Show progress bars/compact animated track and a post-race breakdown.
-
-Four event types with transparent stat weights:
-
-| Race type | Speed | Acceleration | Handling | Reliability |
+| Event | Speed | Acceleration | Handling | Reliability |
 |---|---:|---:|---:|---:|
-| Drag | 20% | 60% | 15% | 5% |
-| Circuit | 35% | 15% | 40% | 10% |
-| Wet Road | 20% | 10% | 50% | 20% |
-| Endurance | 20% | 15% | 15% | 50% |
+| Drag Race | 20% | 60% | 15% | 5% |
+| Circuit Race | 35% | 15% | 40% | 10% |
 
-**Score hypothesis:** weighted car stats + small tactic modifier + seeded event variance of no more than +/-3% of score. Display a recommendation like "Handling is crucial here" and show which stats drove the result. Tactics: Safe improves reliability but sacrifices speed; Push boosts speed/acceleration while increasing risk; Balanced has no modifier. Details must be tuned through deterministic simulation tests.
+Calculate the outcome and intermediate progress phases before the animation. Match a rival whose baseline score for the track differs by at most 2% of the pair's average score. The rival can use the same model if no distinct car offers a close match.
 
-In the first prototype, use just **Drag** and **Circuit**. Add weather/endurance only once racing is fun.
+The score combines weighted stats and tactic effects with seeded variation of up to ±1% for Safe, ±2% for Balanced, and ±3% for Push. The rival uses Balanced variation. Equal rounded scores are settled by a seeded tie-break. The race view shows both cars and progress bars for approximately 12–15 seconds. The player can skip to the same result at any time and see a breakdown of the outcome and the coin reward.
 
-### 4.4 Economy and progression
+## 5. Progress, accessibility, and recovery
 
-- Tutorial grants a free first case and enough coins to enter the first race; the initial car is guaranteed eligible.
-- Starting races give a suggested 100 coins for a win and 60 for a loss; later payouts depend on league. These numbers require balancing.
-- Duplicate cars can be sold for in-game coins (no external market). Allow locking favorite cars to avoid accidental sale.
-- Upgrades: limited to 2 points per stat per upgrade level; cap total stat growth so class specialists remain relevant.
-- Leagues and championships unlock higher-level content based on completed race objectives, not merely opening expensive cases.
-- Quests reward completing different race types, experimenting with a new car, and finishing a collection — not compulsive daily spending.
-- Keep save data in local storage for the prototype; consider CrazyGames progress integration for Full Launch.
+Store wallet, owned cars, selection, race results, and counters as a versioned localStorage snapshot. A case purchase records its cost and car together. A race records its result and reward together. Reload during either animation recovers the saved result without re-rolling, losing a car, or applying the reward twice.
 
-### 4.5 UX / Screens
+Support touch and keyboard interaction, readable rarity labels, and the browser's reduced-motion preference. A confirmed reset starts a fresh save. No account is required.
 
-1. **Garage (home):** prominent next objective, coins, favorite car, playable event.
-2. **Cases:** available cases, clear coin price, odds, short reveal, sell or keep.
-3. **Race preparation:** event name, favored stats, car comparison, tactic choice.
-4. **Race simulation:** 15–25 seconds max, skip possible after initial viewing.
-5. **Results:** position, reason for result, earnings, next unlock.
-6. **Collection:** grid, sort/filter by class/rarity, lock, sell duplicate, upgrades.
-7. **Settings:** sound, accessibility/reduced motion, reset save (with confirmation).
+## 6. Implementation and validation
 
-English UI. Responsive layout with touchscreen support. Readable silhouettes and rarity symbols should not rely on color alone. No account required for prototype.
+TypeScript owns game rules and state. Vite builds the static application, and HTML/CSS with browser animation APIs render the Alpha interface. Consider Phaser if future effects warrant a game renderer. No backend is required for Alpha.
 
-## 5. Distinction from existing car-case games
+- Vitest verifies economy, case odds, deterministic racing, and save integrity.
+- Playwright checks the browser flow on desktop and at a mobile viewport and tests interrupted reveals and races.
+- GitHub Actions builds the app and runs the tests. The production base for GitHub Pages is `/car-case-league/`. Public publication requires separate approval.
 
-Our flagship mechanic is **tactical car selection for automated races**, not manually driving in a racing world. Race-specific weighting, class limits, transparent results and small strategic upgrades must be present at least in the playable public prototype. Original art, branding and UX are required.
+**Alpha acceptance:** Start with a clean save, open the free case, inspect the garage, complete a race, use the reward to buy a second case, and reload without losing or duplicating progress. Build and automated checks pass.
 
-## 6. Scope and milestones
+## 7. Deferred decisions
 
-### Milestone 0 — technical proof / first playable (one vertical slice)
-- Vite + TypeScript + Phaser setup, working desktop/mobile view.
-- 12 unique fictional cars and placeholder original/clearly licensed art.
-- One Rookie case, explicit drop rates, short reveal.
-- Basic garage, lock/sell car, coin balance.
-- Two race types (Drag/Circuit), opponent comparison, automatic event and breakdown.
-- Tutorial, save/load, reset, deterministic data/odds tests and browser smoke test.
-- No backend, multiplayer, payments, live economy, real brands or ads.
+Championships, complex tuning, multiplayer, ads, and payments are outside Alpha. Further cases, weather and endurance races, class-restricted events, and larger catalogs are candidates for later design review.
 
-**Definition of done:** launch on a clean browser, obtain a car, run a race, earn coins, reopen a case, reload and keep progress, without JS console errors. Build and tests pass.
-
-### Milestone 1 — engaging prototype
-- Expand to 24–30 original cars; three cases if balance supports them.
-- Car upgrades; 3–4 event types; league progression.
-- Collection goals and a few achievements.
-- Tune onboarding and reward pacing based on 15–30 testers.
-
-### Milestone 2 — submission candidate
-- 40–60 cars if art quality is consistent; animation/audio polish.
-- Comprehensive Chrome/Edge and mobile testing, accessibility and loading optimization.
-- Player feedback analytics with privacy-compatible approach; exact policy/consent review.
-- CrazyGames SDK integration when required for selected launch stage, official QA compliance checks, cover art.
-
-## 7. Validation and KPIs
-
-**Internal targets (hypotheses; not guaranteed platform approval):**
-- First meaningful action <15 seconds after load (fast networks / reasonable devices).
-- First race completed within 90 seconds of starting.
-- No game-breaking exceptions; saves reliably survive reload.
-- Track completion rate of tutorial, first/second case, first race, session duration and Day-1 retention.
-- Target average session >=10 min and improve from observed player behavior; never inflate session length with mandatory waiting.
-
-CrazyGames Basic Launch publicly discusses average play time, Day-1 retention, conversion to >=1 minute and, from 23 Nov 2026, cover CTR. Confirm requirements before submission: https://docs.crazygames.com/resources/basic-launch-metrics/
-
-## 8. Architecture / quality
-
-- Frontend: TypeScript, Vite, Phaser. No backend for prototype.
-- Separate pure TypeScript domain logic from rendering (`game/economy`, `game/cases`, `game/races`, `game/progression`).
-- Store asset metadata and balance tables as data (JSON or TS config), not scattered constants.
-- Seed random generation for repeatable test scenarios; verify rarity odds statistically.
-- Vitest for mechanics (drop-rate sum, correct rewards, no negative balance, upgrade caps, race determinism, save/load migrations).
-- Playwright for browser flows (first visit, open case, race, save/reload, mobile viewport).
-- `npm run dev`, `npm run build`, `npm run test`, `npm run test:e2e` scripts; GitHub Actions CI.
-- Do not commit build output, credentials, `.env` secrets, node_modules or huge assets.
-- Keep initial download well below 20 MB when practical. Official technical limits: https://docs.crazygames.com/requirements/technical/
-
-## 9. Key decisions / open questions
-
-**Decision now:** fantasy car brands, earned-only currency, auto-races, responsive 2D art, no multiplayer, phased development.
-
-**To test, not assume:** ideal race length, UI style (garage realism vs clean collectible cards), how much luck in racing feels fair, case-price economics, when second/third cases unlock.
-
-**Open legal/platform question:** Even without paid boxes, a chance-based reward system might require content/platform review. Confirm applicable CrazyGames, advertising, ratings, brand/IP and local rules before launch.
+Session length, onboarding completion, and return rates remain design hypotheses. Validate release constraints and metrics before any CrazyGames submission. See the [Basic Launch guide](https://docs.crazygames.com/resources/basic-launch-metrics/) and [technical requirements](https://docs.crazygames.com/requirements/technical/).
