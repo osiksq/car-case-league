@@ -1,13 +1,15 @@
 name: Publish to GitHub Pages
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: github-pages
+  group: ${{ github.ref == 'refs/heads/main' && 'github-pages' || format('github-pages-skipped-{0}', github.run_id) }}
   cancel-in-progress: false
 
 jobs:
@@ -34,15 +36,31 @@ jobs:
 
   deploy:
     needs: build
+    if: github.ref == 'refs/heads/main' && needs.build.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Verify the build is still current
+        id: revision
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          main_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          if [ "$main_sha" = "$GITHUB_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::main has advanced. Skipping this build."
+          fi
       - name: Deploy build
         id: deployment
+        if: steps.revision.outputs.current == 'true'
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

@@ -28,7 +28,9 @@ Playwright checks the production build under the GitHub Pages base path and runs
 
 ## Publish a demo
 
-After publication is approved and the release is merged into `main`, set **Settings → Pages → Source** to **GitHub Actions** and run **Publish to GitHub Pages** manually from `main`. The workflow tests the build before uploading `dist/`. The expected address is [osiksq.github.io/car-case-league/](https://osiksq.github.io/car-case-league/). The workflow has no push trigger.
+With **Settings → Pages → Source** set to **GitHub Actions**, a push to `main`, including a merged pull request, runs **Publish to GitHub Pages**. The workflow builds the game and runs Vitest and Playwright before uploading `dist/`. It publishes only a successful build of the current `main`.
+
+Check the run in **Actions → Publish to GitHub Pages** and open its deployment link after **Deploy build** succeeds. You can also use **Run workflow** and select `main` to publish manually. The site is available at [osiksq.github.io/car-case-league/](https://osiksq.github.io/car-case-league/).
 
 ## Project materials
 
