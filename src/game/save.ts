@@ -1,4 +1,8 @@
 import { cars, economy, events, tactics, type EventId, type Tactic } from './config';
+import {
+  careerEvents, completeCareerEvent, createCareerProgress, isCareerEventId,
+  type CareerEvent, type CareerEventId, type CareerProgress,
+} from './career';
 import { casePrice, cases, drawCaseReward, type CaseId } from './cases';
 import { simulateRace, type RacePhase, type RaceResult } from './race';
 
@@ -20,6 +24,7 @@ export interface GameState {
   garage: OwnedCar[];
   selectedId: string | null;
   progress: { casesOpened: number; racesCompleted: number };
+  career: CareerProgress;
   races: RaceResult[];
   pendingCase: string | null;
   pendingCaseType?: CaseId;
@@ -33,6 +38,7 @@ export function createGame(): GameState {
     garage: [],
     selectedId: null,
     progress: { casesOpened: 0, racesCompleted: 0 },
+    career: createCareerProgress(),
     races: [],
     pendingCase: null,
     pendingRace: null,
@@ -106,20 +112,40 @@ export function sellCar(state: GameState, id: string): GameState {
 }
 
 export function startRace(state: GameState, eventId: EventId, tactic: Tactic, seed?: number): GameState {
+  return raceSession(state, eventId, tactic, seed);
+}
+
+export function startCareerRace(state: GameState, id: CareerEventId, tactic: Tactic, seed?: number): GameState {
+  if (!isCareerEventId(id)) throw new Error('Choose a valid career competition.');
+  const event = careerEvents[id];
+  if (!state.career.unlocked.includes(event.leagueId)) throw new Error('This career league is locked.');
+  return raceSession(state, event.eventId, tactic, seed, event);
+}
+
+function raceSession(state: GameState, eventId: EventId, tactic: Tactic, seed?: number, competition?: CareerEvent): GameState {
   requireIdle(state);
   const owned = requireOwnedCar(state, state.selectedId);
   const car = carById.get(owned.carId);
   if (!car) throw new Error('The selected car is unavailable.');
   if (!Object.hasOwn(events, eventId) || !tactics.includes(tactic)) throw new Error('Choose a valid race and tactic.');
+  const opponent = competition && carById.get(competition.rivalCarId);
+  if (competition && !opponent) throw new Error('The career rival is unavailable.');
+  const rival = competition && opponent
+    ? { opponent, name: competition.rivalName, paceRatio: competition.paceRatio }
+    : undefined;
   const racesCompleted = state.progress.racesCompleted + 1;
-  const race = simulateRace(`race-${racesCompleted}`, eventId, tactic, car, seed);
+  const result = simulateRace(`race-${racesCompleted}`, eventId, tactic, car, seed, rival);
+  const { progress: career, award } = competition && result.won
+    ? completeCareerEvent(state.career, competition.id)
+    : { progress: state.career, award: undefined };
+  const race = competition ? { ...result, careerEventId: competition.id, ...(award ? { careerAward: award } : {}) } : result;
 
-  // Stage the result, history and wallet in the same snapshot. Dismissing a
-  // reveal or loading a pending result never credits the reward a second time.
+  // Commit the result, wallet and career progression before showing the reveal.
   return {
     ...state,
     coins: state.coins + race.reward,
     progress: { ...state.progress, racesCompleted },
+    career,
     races: [...state.races, race],
     pendingRace: race,
   };
@@ -169,7 +195,7 @@ function hasValidCaseMetadata(value: Record<string, unknown>): boolean {
     && typeof value.pendingCaseType === 'string' && Object.hasOwn(cases, value.pendingCaseType));
 }
 
-function isSave(value: unknown): value is GameState {
+function isSave(value: unknown): value is Omit<GameState, 'career'> {
   if (!isObject(value) || value.version !== saveVersion || !isCount(value.coins)) return false;
   if (!isObject(value.progress) || !isCount(value.progress.casesOpened) || !isCount(value.progress.racesCompleted)) return false;
   if (!Array.isArray(value.garage) || !value.garage.every(isOwnedCar)) return false;
@@ -199,7 +225,16 @@ export function readSave(storage: Pick<Storage, 'getItem'>, key = storageKey): G
     const value = parseSave(storage.getItem(key));
     if (isObject(value) && !hasValidCaseMetadata(value)) delete value.pendingCaseType;
     if (!isSave(value)) return createGame();
-    return value.pendingRace ? { ...value, pendingRace: value.races.at(-1) ?? null } : value;
+    // Recorded wins are authoritative so old saves and corrupted career metadata
+    // can be restored without changing the wallet or handing out awards again.
+    let career = createCareerProgress();
+    const races = value.races.map(({ careerEventId, careerAward: _award, ...race }): RaceResult => {
+      if (!isCareerEventId(careerEventId) || careerEvents[careerEventId].eventId !== race.eventId) return race;
+      const completion = race.won ? completeCareerEvent(career, careerEventId) : { progress: career, award: undefined };
+      career = completion.progress;
+      return { ...race, careerEventId, ...(completion.award ? { careerAward: completion.award } : {}) };
+    });
+    return { ...value, career, races, pendingRace: value.pendingRace ? races.at(-1) ?? null : null };
   } catch {
     return createGame();
   }

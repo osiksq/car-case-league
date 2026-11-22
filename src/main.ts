@@ -1,12 +1,15 @@
 import './style.css';
+import './career.css';
+import { careerEvents, type CareerEventId } from './game/career';
 import { buildCaseReel, caseIds, casePrice, type CaseId } from './game/cases';
 import { events, tactics, type EventId, type Tactic } from './game/config';
 import { addDeveloperCoins, developerButton, developerDialog, developerSaveKey, openDeveloperCase } from './dev/developer';
 import {
   createGame, finishCase, finishRace, openCase, readSave, selectCar, sellCar,
-  startRace, storageKey, toggleLock, writeSave, type GameState,
+  startCareerRace, startRace, storageKey, toggleLock, writeSave, type GameState,
 } from './game/save';
 import { animateRace, animateRoulette } from './ui/animation';
+import { careerScreen } from './ui/career';
 import { escapeHtml, icon, money } from './ui/components';
 import {
   caseAnimationScreen, caseResultScreen, casesScreen, carsById, garageScreen,
@@ -17,7 +20,7 @@ const container = document.querySelector<HTMLElement>('#app');
 if (!container) throw new Error('Game container is missing.');
 const app: HTMLElement = container;
 
-const navigation = { cases: 'Cases', garage: 'My Garage', races: 'Races' } as const;
+const navigation = { cases: 'Cases', garage: 'My Garage', career: 'Career', races: 'Races' } as const;
 type Screen = keyof typeof navigation;
 type Visual = 'case' | 'race' | null;
 type Command = (latest: GameState) => GameState;
@@ -31,6 +34,7 @@ const defaultFilters: GarageFilters = { sort: 'recent', rarity: '', carClass: ''
 let game = createGame();
 let screen: Screen = 'cases';
 let selectedCase: CaseId = 'rookie';
+let careerEntry: CareerEventId | null = null;
 let caseReel: ReturnType<typeof buildCaseReel> | null = null;
 let eventId: EventId = 'drag';
 let tactic: Tactic = 'Balanced';
@@ -77,6 +81,12 @@ function gameScreen() {
   switch (screen) {
     case 'garage': return garageScreen(game, filters);
     case 'races': return raceSetupScreen(game, eventId, tactic);
+    case 'career': {
+      const entry = careerEntry ? careerEvents[careerEntry] : undefined;
+      return entry && game.career.unlocked.includes(entry.leagueId)
+        ? raceSetupScreen(game, entry.eventId, tactic, entry)
+        : careerScreen(game);
+    }
     case 'cases':
       return casesScreen(game, selectedCase,
         game.coins >= casePrice(selectedCase, game.progress.casesOpened) || (import.meta.env.DEV && infiniteMoney));
@@ -88,7 +98,7 @@ function dialogMarkup() {
     <div class="panel-heading"><h2 id="settings-title">Settings</h2></div>
     <label class="motion-setting"><input type="checkbox" data-filter="motion"${reducedMotion() ? ' checked' : ''}${mediaMotion.matches ? ' disabled' : ''}> Reduce Motion</label>
     ${mediaMotion.matches ? '<p class="action-hint">Your device has requested reduced motion.</p>' : ''}
-    <p>Reset clears your cars, coins and race history on this device.</p>
+    <p>Reset clears your cars, coins, race history and career on this device.</p>
     <div class="button-row">
       <button type="button" class="button button-secondary" data-action="close-settings">Close</button>
       <button type="button" class="button button-secondary" data-action="reset">Reset Progress</button>
@@ -100,10 +110,12 @@ function render(focus?: 'heading' | RestoreFocus) {
   stopAnimation();
   stopAnimation = () => {};
   document.documentElement.classList.toggle('reduced-motion', reducedMotion());
-  const activeScreen: Screen = game.pendingCase ? 'cases' : game.pendingRace ? 'races' : screen;
+  const activeScreen: Screen = game.pendingCase ? 'cases'
+    : game.pendingRace ? (game.pendingRace.careerEventId ? 'career' : 'races') : screen;
   const view = game.pendingCase || game.pendingRace
     ? `${activeScreen}:${animation ?? 'result'}`
-    : screen === 'cases' ? `cases:${selectedCase}` : screen;
+    : screen === 'cases' ? `cases:${selectedCase}`
+    : screen === 'career' && careerEntry ? `career:${careerEntry}` : screen;
   const transition = view !== renderedView;
   renderedView = view;
   const visibleWallet = animation === 'race' ? game.coins - (game.pendingRace?.reward ?? 0) : game.coins;
@@ -226,11 +238,12 @@ function beginCase() {
 function beginRace() {
   const selectedId = game.selectedId;
   const completed = game.progress.racesCompleted;
+  const competition = screen === 'career' ? careerEntry : null;
   void transact((latest) => {
     if (selectedId !== latest.selectedId || completed !== latest.progress.racesCompleted) {
       throw new Error('Progress changed in another tab. Review your race entry.');
     }
-    return startRace(latest, eventId, tactic);
+    return competition ? startCareerRace(latest, competition, tactic) : startRace(latest, eventId, tactic);
   }, () => { animation = reducedMotion() ? null : 'race'; });
 }
 
@@ -239,6 +252,7 @@ function resetProgress(message: string) {
   void transact(createGame, () => {
     screen = 'cases';
     selectedCase = 'rookie';
+    careerEntry = null;
     eventId = 'drag';
     tactic = 'Balanced';
     filters = { ...defaultFilters };
@@ -280,6 +294,19 @@ function handleAction(button: HTMLButtonElement) {
     case 'nav-cases': changeScreen('cases'); break;
     case 'nav-garage': changeScreen('garage'); break;
     case 'nav-races': changeScreen('races'); break;
+    case 'nav-career':
+    case 'race-career':
+      careerEntry = null;
+      changeScreen('career');
+      break;
+    case 'career-event': {
+      if (!id || !Object.hasOwn(careerEvents, id)) break;
+      const entry = careerEvents[id as CareerEventId];
+      if (!game.career.unlocked.includes(entry.leagueId)) break;
+      careerEntry = entry.id;
+      changeScreen('career');
+      break;
+    }
     case 'select-case': {
       const choice = caseIds.find((candidate) => candidate === id);
       if (!choice || choice === selectedCase) break;
@@ -296,7 +323,17 @@ function handleAction(button: HTMLButtonElement) {
     case 'sell-case': dismissResult('cases', 'sell'); break;
     case 'garage-case':
     case 'race-garage': dismissResult('garage'); break;
-    case 'race-again': dismissResult('races'); break;
+    case 'race-again': {
+      const race = game.pendingRace;
+      if (race?.careerEventId) {
+        careerEntry = race.careerEventId;
+        tactic = race.tactic;
+        dismissResult('career');
+      } else {
+        dismissResult('races');
+      }
+      break;
+    }
     case 'clear-filters':
       filters = { ...defaultFilters };
       render({ filter: 'sort' });

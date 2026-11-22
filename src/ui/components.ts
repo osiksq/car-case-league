@@ -6,6 +6,7 @@ const iconPaths = {
   cases: '<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M8 6V4h8v2M3 13h18m-11 0v2h4v-2"/>',
   garage: '<path d="m3 11 9-7 9 7v9H3v-9Z"/><path d="M7 20v-7h10v7m-10-3h10"/>',
   races: '<path d="M4 21V4m0 1c5-4 10 4 16 0v10c-6 4-11-4-16 0m5-10v5m5 0v5m-5-5v4"/>',
+  career: '<path d="M7 4h10v6a5 5 0 0 1-10 0V4Zm0 2H4v2a4 4 0 0 0 4 4m9-6h3v2a4 4 0 0 1-4 4m-4 3v4m-4 0h8"/>',
   coin: '<circle cx="12" cy="12" r="8"/><path d="M9 12h6m-3-3v6"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="m10 3-.5 2.5L7 7l-2.5-.7L3 9l2 2v2l-2 2 1.5 2.7L7 17l2.5 1.5L10 21h4l.5-2.5L17 17l2.5.7L21 15l-2-2v-2l2-2-1.5-2.7L17 7l-2.5-1.5L14 3h-4Z"/>',
   lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 1 1 8 0v3"/>',
