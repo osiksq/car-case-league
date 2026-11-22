@@ -1,5 +1,6 @@
 import './style.css';
-import { economy, events, tactics, type EventId, type Tactic } from './game/config';
+import { buildCaseReel, caseIds, casePrice, type CaseId } from './game/cases';
+import { events, tactics, type EventId, type Tactic } from './game/config';
 import { addDeveloperCoins, developerButton, developerDialog, developerSaveKey, openDeveloperCase } from './dev/developer';
 import {
   createGame, finishCase, finishRace, openCase, readSave, selectCar, sellCar,
@@ -29,6 +30,8 @@ const defaultFilters: GarageFilters = { sort: 'recent', rarity: '', carClass: ''
 
 let game = createGame();
 let screen: Screen = 'cases';
+let selectedCase: CaseId = 'rookie';
+let caseReel: ReturnType<typeof buildCaseReel> | null = null;
 let eventId: EventId = 'drag';
 let tactic: Tactic = 'Balanced';
 let filters = { ...defaultFilters };
@@ -42,6 +45,7 @@ let renderedView = '';
 
 try {
   game = readSave(localStorage, activeSaveKey);
+  selectedCase = game.pendingCaseType ?? selectedCase;
   motionPreference = localStorage.getItem(motionKey) === 'true';
 } catch {
   notice = 'Local storage is unavailable. Enable storage to play and save your progress.';
@@ -55,7 +59,12 @@ function gameScreen() {
   if (game.pendingCase) {
     const owned = game.garage.find((entry) => entry.id === game.pendingCase);
     const car = owned && carsById.get(owned.carId);
-    if (car) return animation === 'case' ? caseAnimationScreen(car) : caseResultScreen(game, car);
+    const caseId = game.pendingCaseType ?? 'rookie';
+    if (car) {
+      return animation === 'case' && caseReel
+        ? caseAnimationScreen(caseId, caseReel)
+        : caseResultScreen(game, car, caseId);
+    }
   }
   if (game.pendingRace) {
     const race = game.pendingRace;
@@ -68,7 +77,9 @@ function gameScreen() {
   switch (screen) {
     case 'garage': return garageScreen(game, filters);
     case 'races': return raceSetupScreen(game, eventId, tactic);
-    case 'cases': return casesScreen(game, game.coins >= economy.casePrice || (import.meta.env.DEV && infiniteMoney));
+    case 'cases':
+      return casesScreen(game, selectedCase,
+        game.coins >= casePrice(selectedCase, game.progress.casesOpened) || (import.meta.env.DEV && infiniteMoney));
   }
 }
 
@@ -90,7 +101,9 @@ function render(focus?: 'heading' | RestoreFocus) {
   stopAnimation = () => {};
   document.documentElement.classList.toggle('reduced-motion', reducedMotion());
   const activeScreen: Screen = game.pendingCase ? 'cases' : game.pendingRace ? 'races' : screen;
-  const view = game.pendingCase || game.pendingRace ? `${activeScreen}:${animation ?? 'result'}` : activeScreen;
+  const view = game.pendingCase || game.pendingRace
+    ? `${activeScreen}:${animation ?? 'result'}`
+    : screen === 'cases' ? `cases:${selectedCase}` : screen;
   const transition = view !== renderedView;
   renderedView = view;
   const visibleWallet = animation === 'race' ? game.coins - (game.pendingRace?.reward ?? 0) : game.coins;
@@ -141,6 +154,7 @@ function render(focus?: 'heading' | RestoreFocus) {
 
 function showResult() {
   animation = null;
+  caseReel = null;
   render('heading');
 }
 
@@ -148,11 +162,13 @@ async function transact(command: Command, onCommit: () => void, focus: 'heading'
   if (commandPending) return;
   commandPending = true;
   let latest: GameState | undefined;
+  let committed = false;
   const save = () => {
     latest = readSave(localStorage, activeSaveKey);
     const next = command(latest);
     if (next !== latest) writeSave(localStorage, next, activeSaveKey);
     game = next;
+    committed = true;
   };
 
   try {
@@ -161,8 +177,9 @@ async function transact(command: Command, onCommit: () => void, focus: 'heading'
     notice = '';
     onCommit();
   } catch (error) {
-    if (latest) game = latest;
+    if (!committed && latest) game = latest;
     animation = null;
+    caseReel = null;
     notice = error instanceof Error ? error.message : 'Could not save progress. Try again.';
   } finally {
     commandPending = false;
@@ -192,10 +209,18 @@ function dismissResult(next: Screen, action: 'keep' | 'sell' = 'keep') {
 
 function beginCase() {
   const opened = game.progress.casesOpened;
+  const caseId = selectedCase;
   void transact((latest) => {
     if (opened !== latest.progress.casesOpened) throw new Error('Progress changed in another tab. Review the current case.');
-    return import.meta.env.DEV && infiniteMoney ? openDeveloperCase(latest) : openCase(latest);
-  }, () => { animation = reducedMotion() ? null : 'case'; });
+    return import.meta.env.DEV && infiniteMoney ? openDeveloperCase(latest, caseId) : openCase(latest, caseId);
+  }, () => {
+    const owned = game.garage.find((entry) => entry.id === game.pendingCase);
+    const reward = owned && carsById.get(owned.carId);
+    if (reward && !reducedMotion()) {
+      caseReel = buildCaseReel(caseId, reward);
+      animation = 'case';
+    }
+  });
 }
 
 function beginRace() {
@@ -213,6 +238,7 @@ function resetProgress(message: string) {
   if (!window.confirm(message)) return;
   void transact(createGame, () => {
     screen = 'cases';
+    selectedCase = 'rookie';
     eventId = 'drag';
     tactic = 'Balanced';
     filters = { ...defaultFilters };
@@ -254,6 +280,14 @@ function handleAction(button: HTMLButtonElement) {
     case 'nav-cases': changeScreen('cases'); break;
     case 'nav-garage': changeScreen('garage'); break;
     case 'nav-races': changeScreen('races'); break;
+    case 'select-case': {
+      const choice = caseIds.find((candidate) => candidate === id);
+      if (!choice || choice === selectedCase) break;
+      selectedCase = choice;
+      notice = '';
+      render({ action, id });
+      break;
+    }
     case 'open-case': beginCase(); break;
     case 'start-race': beginRace(); break;
     case 'skip': showResult(); break;
@@ -334,7 +368,9 @@ window.addEventListener('storage', (event) => {
   if ((event.key !== activeSaveKey && event.key !== null) || commandPending) return;
   try {
     game = readSave(localStorage, activeSaveKey);
+    selectedCase = game.pendingCaseType ?? selectedCase;
     animation = null;
+    caseReel = null;
     render();
   } catch {
     notice = 'Progress could not be read from local storage.';
