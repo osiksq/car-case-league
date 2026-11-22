@@ -27,6 +27,7 @@ interface CareerRival {
   opponent: Car;
   name: string;
   paceRatio: number;
+  volatility: number;
 }
 
 const statNames: Record<Stat, string> = {
@@ -90,15 +91,11 @@ export function simulateRace(
   const random = createRandom(seed);
   const { weights } = events[eventId];
   const opponent = careerRival?.opponent ?? pickOpponent(player, weights, random);
-  // Pace career rivals against the selected car's underlying track score.
-  // The fixed competition handicap keeps the field open to all existing models.
-  const opponentBaseScore = careerRival
-    ? weightedScore(player.stats, weights) * careerRival.paceRatio
-    : weightedScore(opponent.stats, weights);
-  const variation = (approach: Tactic) => 1 + (2 * random() - 1) * tacticVolatility[approach];
+  const opponentBaseScore = weightedScore(opponent.stats, weights) * (careerRival?.paceRatio ?? 1);
+  const variation = (volatility: number) => 1 + (2 * random() - 1) * volatility;
   const playerBaseScore = weightedScore(player.stats, weights, tacticModifiers[tactic]);
-  const playerScore = roundScore(playerBaseScore * variation(tactic));
-  const opponentScore = roundScore(opponentBaseScore * variation('Balanced'));
+  const playerScore = roundScore(playerBaseScore * variation(tacticVolatility[tactic]));
+  const opponentScore = roundScore(opponentBaseScore * variation(careerRival?.volatility ?? tacticVolatility.Balanced));
   const tied = playerScore === opponentScore;
   const won = tied ? random() < 0.5 : playerScore > opponentScore;
 
@@ -111,7 +108,7 @@ export function simulateRace(
     playerScore,
     opponentScore,
     explanation: careerRival
-      ? `${won ? 'You won.' : 'You lost.'} ${careerRival.name}'s pace was set relative to your car's base track score. ${tied ? 'A seeded tie-break settled the finish.' : `${tactic} and race-day variation set your final score.`}`
+      ? `${won ? 'You won.' : 'You lost.'} ${careerRival.name}'s pace comes from their car and this event's setup. ${tied ? 'A seeded tie-break settled the finish.' : `${tactic} and race-day variation set your final score.`}`
       : describeResult(won, player, opponent, weights, tactic, tied, roundScore(playerScore - playerBaseScore)),
     phases: buildPhases(player, opponent, playerScore, opponentScore, won),
   };

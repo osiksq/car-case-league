@@ -131,7 +131,12 @@ function raceSession(state: GameState, eventId: EventId, tactic: Tactic, seed?: 
   const opponent = competition && carById.get(competition.rivalCarId);
   if (competition && !opponent) throw new Error('The career rival is unavailable.');
   const rival = competition && opponent
-    ? { opponent, name: competition.rivalName, paceRatio: competition.paceRatio }
+    ? {
+      opponent,
+      name: competition.rivalName,
+      paceRatio: competition.paceRatio,
+      volatility: competition.rivalVolatility,
+    }
     : undefined;
   const racesCompleted = state.progress.racesCompleted + 1;
   const result = simulateRace(`race-${racesCompleted}`, eventId, tactic, car, seed, rival);

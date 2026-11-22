@@ -75,7 +75,9 @@ The Career screen shows the current league, event clears, promotion rules, and l
 | Pro | Apex Sprint and Ridge Circuit | Pro Crest and access to Elite League |
 | Elite | Crown Sprint and Summit Circuit | Elite Crest |
 
-Career competitions use the existing Drag and Circuit rules and automatic race animation. Each has a named rival, an existing car model, and a configurable pace relative to the entrant's baseline track score. Pace increases through the league lineup. Every owned car can race in every unlocked competition, and the player chooses a tactic before starting. A competition can be retried after a loss or replayed after a win.
+Career competitions use the existing Drag and Circuit rules and automatic race animation. A rival's base score is the track-weighted score of their own car multiplied by the event's pace factor. Seeded variation uses a fixed range for each event. The same competition and seed give the same rival score for every player car and tactic. Both tracks get progressively stronger rivals from Rookie to Elite.
+
+Either Common starter can clear Rookie. Higher leagues favor stronger cars and track specialists. Elite leaves room for a competitive Legendary car and for a Mythic car to lose. Every owned car can enter every unlocked competition, and a competition can be retried or replayed. Free races remain a way to earn coins and improve the garage.
 
 Free races remain available in Race Control. Career races use the same standard win and loss payments as free races, including replays. Promotions award crests and access to competitions without a coin bonus. The career configuration defines the leagues, events, rivals, difficulty, and crests.
 

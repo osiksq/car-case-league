@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { careerEvents, createCareerProgress, leagueIds, leagues, type CareerEventId } from '../src/game/career';
-import { cars, economy } from '../src/game/config';
+import { cars, economy, type Car, type Tactic } from '../src/game/config';
+import { simulateRace } from '../src/game/race';
 import {
   createGame, finishCase, finishRace, openCase, readSave, startCareerRace, startRace,
   storageKey, writeSave, type GameState,
@@ -8,6 +9,31 @@ import {
 
 function startWithCar(): GameState {
   return finishCase(openCase(createGame(), 'rookie', 12), 'keep');
+}
+
+function catalogCar(id: string): Car {
+  const car = cars.find((model) => model.id === id);
+  if (!car) throw new Error(`Unknown fixture car: ${id}`);
+  return car;
+}
+
+function careerWithCar(carId: string): GameState {
+  const ready = startWithCar();
+  return {
+    ...ready,
+    garage: [{ ...ready.garage[0], carId }],
+    career: { completed: [], unlocked: [...leagueIds] },
+  };
+}
+
+function winRate(carId: string, eventId: CareerEventId, tactic: Tactic = 'Balanced'): number {
+  const state = careerWithCar(carId);
+  const samples = 2_048;
+  let wins = 0;
+  for (let seed = 0; seed < samples; seed++) {
+    if (startCareerRace(state, eventId, tactic, seed).pendingRace?.won) wins++;
+  }
+  return wins / samples;
 }
 
 function raceWithOutcome(state: GameState, eventId: CareerEventId, won: boolean): GameState {
@@ -37,12 +63,14 @@ describe('career progression', () => {
     expect(() => startCareerRace(openCase(fresh, 'rookie', 12), 'depot-sprint', 'Balanced', 0)).toThrow(/finish/i);
   });
 
-  it('advances through the four leagues on distinct wins even with the starter car', () => {
-    let game = startWithCar();
-    const starter = game.garage[0];
+  it('advances through all four leagues with distinct wins and a non-Mythic garage', () => {
+    const ready = startWithCar();
+    const garage = [...ready.garage, { id: 'car-2', carId: 'sorevik-t9', locked: false }];
+    let game = { ...ready, garage, progress: { ...ready.progress, casesOpened: 2 } };
 
     for (const [index, league] of leagueIds.entries()) {
       const [first, second] = leagues[league].eventIds;
+      if (index === 1) game = { ...game, selectedId: 'car-2' };
       expect(game.career.unlocked).toEqual(leagueIds.slice(0, index + 1));
       expect(careerEvents[first].rivalCarId).not.toBe(careerEvents[second].rivalCarId);
       const firstWin = raceWithOutcome(game, first, true);
@@ -55,7 +83,7 @@ describe('career progression', () => {
       expect(promotion.pendingRace?.careerAward).toBe(league);
       expect(promotion.career.unlocked).toEqual(leagueIds.slice(0, index + 2));
       expect(promotion.career.completed).toEqual(leagueIds.slice(0, index + 1).flatMap((id) => leagues[id].eventIds));
-      expect(promotion.garage).toEqual([starter]);
+      expect(promotion.garage).toEqual(garage);
       game = finishRace(promotion);
     }
 
@@ -83,24 +111,78 @@ describe('career progression', () => {
     expect(repeat.races.filter((race) => race.careerAward)).toHaveLength(1);
   });
 
-  it('keeps Elite difficulty winnable with any existing model and seeds deterministic results', () => {
-    const ready = startWithCar();
-    for (const model of cars) {
-      const state = {
-        ...ready,
-        garage: [{ ...ready.garage[0], carId: model.id }],
-        career: { completed: [], unlocked: [...leagueIds] },
-      };
-      for (const eventId of leagues.elite.eventIds) {
-        const win = raceWithOutcome(state, eventId, true);
-        const loss = raceWithOutcome(state, eventId, false);
-        expect(win.pendingRace?.won).toBe(true);
-        expect(loss.pendingRace?.won).toBe(false);
-        expect(startCareerRace(state, eventId, 'Safe', 123)).toEqual(
-          startCareerRace(state, eventId, 'Safe', 123),
-        );
+});
+
+describe('fixed career rivals', () => {
+  it('keeps the same rival score for different cars and tactics at the same seed', () => {
+    for (const eventId of ['depot-sprint', 'summit-circuit'] as const) {
+      const slow = careerWithCar('bravik-110');
+      const fast = careerWithCar('orvane-eclipse');
+      for (const seed of [0, 41, 120, 1001]) {
+        const start = startCareerRace(slow, eventId, 'Safe', seed).pendingRace;
+        const upgrade = startCareerRace(fast, eventId, 'Push', seed).pendingRace;
+        expect(upgrade?.opponentScore).toBe(start?.opponentScore);
+        expect(upgrade?.playerScore).toBeGreaterThan(start!.playerScore);
+        expect(startCareerRace(fast, eventId, 'Push', seed).pendingRace).toEqual(upgrade);
       }
     }
+  });
+
+  it('uses the rival stats and makes a player stat upgrade improve wins at fixed odds', () => {
+    const player = catalogCar('sorevik-t9');
+    const opponent = catalogCar('orvane-eclipse');
+    const tuned = { ...player, stats: { ...player.stats, handling: player.stats.handling + 4 } };
+    const rival = { opponent, name: 'Fixture rival', paceRatio: 0.97, volatility: 0.065 };
+    const fasterRival = { ...rival, opponent: { ...opponent, stats: { ...opponent.stats, handling: opponent.stats.handling + 4 } } };
+    let improvements = 0;
+    for (let seed = 0; seed < 512; seed++) {
+      const original = simulateRace('original', 'circuit', 'Balanced', player, seed, rival);
+      const upgrade = simulateRace('upgrade', 'circuit', 'Balanced', tuned, seed, rival);
+      const harder = simulateRace('harder', 'circuit', 'Balanced', player, seed, fasterRival);
+      expect(upgrade.opponentScore).toBe(original.opponentScore);
+      expect(harder.opponentScore).toBeGreaterThan(original.opponentScore);
+      expect(upgrade.playerScore).toBeGreaterThan(original.playerScore);
+      if (original.won) expect(upgrade.won).toBe(true);
+      if (!original.won && upgrade.won) improvements++;
+    }
+    expect(improvements).toBeGreaterThan(20);
+  });
+
+  it('raises opponent scores on each track from Rookie to Elite', () => {
+    const state = careerWithCar('bravik-110');
+    for (const track of ['drag', 'circuit'] as const) {
+      const scores = leagueIds.map((league) => {
+        const eventId = leagues[league].eventIds.find((id) => careerEvents[id].eventId === track)!;
+        return startCareerRace(state, eventId, 'Balanced', 42).pendingRace!.opponentScore;
+      });
+      for (let index = 1; index < scores.length; index++) {
+        expect(scores[index] - scores[index - 1]).toBeGreaterThan(8);
+      }
+    }
+  });
+
+  it('lets either Common starter clear Rookie and makes better cars matter in higher leagues', () => {
+    for (const id of ['bravik-110', 'petrel-s1']) {
+      expect(winRate(id, 'depot-sprint', 'Push')).toBeGreaterThan(0.5);
+      expect(winRate(id, 'foundry-loop', 'Safe')).toBeGreaterThan(0.45);
+    }
+    expect(winRate('bravik-110', 'ridge-circuit')).toBeLessThan(0.05);
+    expect(winRate('kairox-r', 'ridge-circuit')).toBeGreaterThan(0.65);
+    for (const eventId of ['crown-sprint', 'summit-circuit'] as const) {
+      expect(winRate('bravik-110', eventId)).toBe(0);
+      const legendary = winRate('sorevik-t9', eventId);
+      const mythic = winRate('orvane-eclipse', eventId);
+      expect(legendary).toBeGreaterThan(0.2);
+      expect(mythic - legendary).toBeGreaterThan(0.15);
+      expect(mythic).toBeLessThan(0.98);
+    }
+  });
+
+  it('makes the best tactic depend on the track', () => {
+    expect(winRate('sorevik-t9', 'crown-sprint', 'Push') - winRate('sorevik-t9', 'crown-sprint', 'Safe'))
+      .toBeGreaterThan(0.07);
+    expect(winRate('sorevik-t9', 'summit-circuit', 'Safe') - winRate('sorevik-t9', 'summit-circuit', 'Push'))
+      .toBeGreaterThan(0.05);
   });
 });
 
