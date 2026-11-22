@@ -1,4 +1,5 @@
 import { cars, economy, events, stats, tacticModifiers, tacticVolatility, type Car, type CarStats, type EventId, type Stat, type Tactic } from './config';
+import type { CareerEventId, LeagueId } from './career';
 import { createRandom } from './random';
 
 export interface RacePhase {
@@ -18,6 +19,15 @@ export interface RaceResult {
   opponentScore: number;
   explanation: string;
   phases: RacePhase[];
+  careerEventId?: CareerEventId;
+  careerAward?: LeagueId;
+}
+
+interface CareerRival {
+  opponent: Car;
+  name: string;
+  paceRatio: number;
+  volatility: number;
 }
 
 const statNames: Record<Stat, string> = {
@@ -75,14 +85,17 @@ function buildPhases(player: Car, opponent: Car, playerScore: number, opponentSc
   }));
 }
 
-export function simulateRace(id: string, eventId: EventId, tactic: Tactic, player: Car, seed?: number): RaceResult {
+export function simulateRace(
+  id: string, eventId: EventId, tactic: Tactic, player: Car, seed?: number, careerRival?: CareerRival,
+): RaceResult {
   const random = createRandom(seed);
   const { weights } = events[eventId];
-  const opponent = pickOpponent(player, weights, random);
-  const variation = (approach: Tactic) => 1 + (2 * random() - 1) * tacticVolatility[approach];
+  const opponent = careerRival?.opponent ?? pickOpponent(player, weights, random);
+  const opponentBaseScore = weightedScore(opponent.stats, weights) * (careerRival?.paceRatio ?? 1);
+  const variation = (volatility: number) => 1 + (2 * random() - 1) * volatility;
   const playerBaseScore = weightedScore(player.stats, weights, tacticModifiers[tactic]);
-  const playerScore = roundScore(playerBaseScore * variation(tactic));
-  const opponentScore = roundScore(weightedScore(opponent.stats, weights) * variation('Balanced'));
+  const playerScore = roundScore(playerBaseScore * variation(tacticVolatility[tactic]));
+  const opponentScore = roundScore(opponentBaseScore * variation(careerRival?.volatility ?? tacticVolatility.Balanced));
   const tied = playerScore === opponentScore;
   const won = tied ? random() < 0.5 : playerScore > opponentScore;
 
@@ -94,7 +107,9 @@ export function simulateRace(id: string, eventId: EventId, tactic: Tactic, playe
     reward: won ? economy.winReward : economy.lossReward,
     playerScore,
     opponentScore,
-    explanation: describeResult(won, player, opponent, weights, tactic, tied, roundScore(playerScore - playerBaseScore)),
+    explanation: careerRival
+      ? `${won ? 'You won.' : 'You lost.'} ${careerRival.name}'s pace comes from their car and this event's setup. ${tied ? 'A seeded tie-break settled the finish.' : `${tactic} and race-day variation set your final score.`}`
+      : describeResult(won, player, opponent, weights, tactic, tied, roundScore(playerScore - playerBaseScore)),
     phases: buildPhases(player, opponent, playerScore, opponentScore, won),
   };
 }

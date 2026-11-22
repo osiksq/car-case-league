@@ -1,6 +1,6 @@
 # Car Case League — Game Design Document
 
-- **Version:** 0.2 · Alpha 0.1
+- **Version:** 0.3 · Alpha 0.2 (Career Update)
 - **Platform:** Desktop and mobile web
 - **Audience:** Casual browser players · English interface
 
@@ -60,13 +60,32 @@ Select an owned car and a tactic before entering a one-on-one auto race. Safe fa
 | Drag Race | 20% | 60% | 15% | 5% |
 | Circuit Race | 35% | 15% | 40% | 10% |
 
-Calculate the outcome and intermediate progress phases before the animation. Match a rival whose baseline score for the track differs by at most 2% of the pair's average score. The rival can use the same model if no distinct car offers a close match.
+Calculate the outcome and intermediate progress phases before the animation. In a free race, match a rival whose baseline score for the track differs by at most 2% of the pair's average score. The rival can use the same model if no distinct car offers a close match.
 
 The score combines weighted stats and tactic effects with seeded variation of up to ±1% for Safe, ±2% for Balanced, and ±3% for Push. The rival uses Balanced variation. Equal rounded scores are settled by a seeded tie-break. The race view shows both cars and progress bars for approximately 12–15 seconds. The player can skip to the same result at any time and see a breakdown of the outcome and the coin reward.
+
+### 4.1 Career
+
+The Career screen shows the current league, event clears, promotion rules, and league rewards. Start in Rookie League. Win both distinct competitions in a league to earn its crest and unlock the next league. Completing Elite earns the final crest. Free races, repeat wins, losses, and coin spending do not advance the career.
+
+| League | Competitions | One-time reward |
+|---|---|---|
+| Rookie | Depot Sprint and Foundry Loop | Rookie Crest and access to Street League |
+| Street | Neon Straight and Harbor Loop | Street Crest and access to Pro League |
+| Pro | Apex Sprint and Ridge Circuit | Pro Crest and access to Elite League |
+| Elite | Crown Sprint and Summit Circuit | Elite Crest |
+
+Career competitions use the existing Drag and Circuit rules and automatic race animation. A rival's base score is the track-weighted score of their own car multiplied by the event's pace factor. Seeded variation uses a fixed range for each event. The same competition and seed give the same rival score for every player car and tactic. Both tracks get progressively stronger rivals from Rookie to Elite.
+
+Either Common starter can clear Rookie. Higher leagues favor stronger cars and track specialists. Elite leaves room for a competitive Legendary car and for a Mythic car to lose. Every owned car can enter every unlocked competition, and a competition can be retried or replayed. Free races remain a way to earn coins and improve the garage.
+
+Free races remain available in Race Control. Career races use the same standard win and loss payments as free races, including replays. Promotions award crests and access to competitions without a coin bonus. The career configuration defines the leagues, events, rivals, difficulty, and crests.
 
 ## 5. Progress, accessibility, and recovery
 
 Store wallet, owned cars, selection, race results, and counters as a versioned localStorage snapshot. A case purchase records its cost and car together. A race records its result and reward together. Reload during either animation recovers the saved result without re-rolling, losing a car, or applying the reward twice.
+
+Keep the career's cleared competitions and unlocked leagues in the same snapshot as the race outcome and wallet. A league crest is earned once. A pending result can show the same promotion after reload without granting a second reward. Saves from Alpha 0.1 retain their inventory, wallet, and race history and start in Rookie League. Keep competition IDs and league assignments stable for existing saves.
 
 Support touch and keyboard interaction, readable rarity labels, and the browser's reduced-motion preference. A confirmed reset starts a fresh save. No account is required.
 
@@ -74,11 +93,11 @@ Support touch and keyboard interaction, readable rarity labels, and the browser'
 
 TypeScript owns game rules and state. Vite builds the static application, and HTML/CSS with browser animation APIs render the Alpha interface. Consider Phaser if future effects warrant a game renderer. No backend is required for Alpha.
 
-- Vitest verifies economy, case odds, deterministic racing, and save integrity.
-- Playwright checks the browser flow on desktop and at a mobile viewport and tests interrupted reveals and races.
+- Vitest verifies economy, case odds, deterministic racing, save integrity, and promotion across all four leagues.
+- Playwright checks the browser flow on desktop and at a mobile viewport, including interrupted reveals, promotions, and career replays.
 - GitHub Actions builds the app and runs the tests. The production base for GitHub Pages is `/car-case-league/`. Public publication requires separate approval.
 
-**Alpha acceptance:** Start with a clean save, open the free case, inspect the garage, complete a race, use the reward to buy a second case, and reload without losing or duplicating progress. Build and automated checks pass.
+**Alpha acceptance:** Start with a clean save, open the free case, inspect the garage, complete a race, use the reward to buy a second case, and reload without losing or duplicating progress. Win two Rookie competitions, confirm the Street unlock and Rookie Crest after reload, and replay a completed event without earning the crest again. Build and automated checks pass.
 
 ## 7. Deferred decisions
 

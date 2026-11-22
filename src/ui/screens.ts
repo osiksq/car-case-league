@@ -3,7 +3,9 @@ import {
   type Car, type EventId, type Tactic,
 } from '../game/config';
 import { caseIds, casePool, casePrice, cases, type CaseId } from '../game/cases';
+import { careerEvents, leagues, type CareerEvent } from '../game/career';
 import type { GameState } from '../game/save';
+import { careerAward } from './career';
 import { carCard, carImage, carStyle, carStats, escapeHtml, icon, money, oddsTable, pageHeading, rarityBadge, statEntries } from './components';
 
 export const carsById = new Map(cars.map((car) => [car.id, car]));
@@ -157,22 +159,36 @@ export function garageScreen(game: GameState, filters: GarageFilters) {
   </section>`;
 }
 
-export function raceSetupScreen(game: GameState, eventId: EventId, tactic: Tactic) {
+export function raceSetupScreen(game: GameState, eventId: EventId, tactic: Tactic, competition?: CareerEvent) {
   const selected = game.garage.find((car) => car.id === game.selectedId);
   const car = selected && carsById.get(selected.carId);
-  const races = Array.from(game.races).slice(-3).reverse();
+  const races = game.races.filter((race) => race.careerEventId === competition?.id).slice(-3).reverse();
+  const rival = competition && carsById.get(competition.rivalCarId);
+  const event = events[eventId];
 
   return `<section class="race-screen" aria-labelledby="screen-title">
-    ${pageHeading('TRACK EVENTS', 'Race Control', 'Choose a track, set your tactic and let your car do the driving.')}
+    ${competition
+      ? pageHeading(escapeHtml(leagues[competition.leagueId].name), escapeHtml(competition.name), 'Choose your car and tactic for this career competition.')
+      : pageHeading('TRACK EVENTS', 'Race Control', 'Choose a track, set your tactic and let your car do the driving.')}
     <div class="race-setup">
       <section class="race-options panel" aria-labelledby="event-title">
-        <div class="panel-heading"><h2 id="event-title">Choose a track</h2></div>
-        <div class="event-options">${(Object.keys(events) as EventId[]).map((id) => `
-          <button class="option-button" type="button" data-action="event" data-id="${id}" aria-label="${escapeHtml(events[id].name)}" aria-pressed="${id === eventId}">
-            ${icon(id === 'drag' ? 'bolt' : 'races')}<span><strong>${escapeHtml(events[id].name)}</strong><small>${escapeHtml(events[id].description)}</small></span>
-          </button>`).join('')}
-        </div>
-        <div class="track-weights" aria-label="Track stat weights">${statEntries.map(([stat, label]) => `<span>${label} <strong>${events[eventId].weights[stat]}%</strong></span>`).join('')}</div>
+        ${competition ? `<div class="panel-heading"><h2 id="event-title">Opponent</h2><span>${escapeHtml(competition.difficulty)}</span></div>
+          <div class="career-rival" data-league-theme="${competition.leagueId}">
+            ${rival ? `<div class="career-rival-art">${carImage(rival, true)}</div>` : ''}
+            <div class="career-rival-details">
+              <h3>${escapeHtml(competition.rivalName)}</h3>
+              <p>${rival ? escapeHtml(rival.name) : ''}</p>
+              <strong>${escapeHtml(event.name)}</strong>
+              <p>${escapeHtml(event.description)}</p>
+            </div>
+          </div>` : `
+          <div class="panel-heading"><h2 id="event-title">Choose a track</h2></div>
+          <div class="event-options">${(Object.keys(events) as EventId[]).map((id) => `
+            <button class="option-button" type="button" data-action="event" data-id="${id}" aria-label="${escapeHtml(events[id].name)}" aria-pressed="${id === eventId}">
+              ${icon(id === 'drag' ? 'bolt' : 'races')}<span><strong>${escapeHtml(events[id].name)}</strong><small>${escapeHtml(events[id].description)}</small></span>
+            </button>`).join('')}
+          </div>`}
+        <div class="track-weights" aria-label="Track stat weights">${statEntries.map(([stat, label]) => `<span>${label} <strong>${event.weights[stat]}%</strong></span>`).join('')}</div>
         <div class="panel-heading"><h2>Choose a tactic</h2></div>
         <div class="tactic-options">${tactics.map((entry) => `<button class="option-button" type="button" data-action="tactic" data-id="${entry}" aria-label="${entry}" aria-pressed="${entry === tactic}"><span><strong>${entry}</strong><small>${tacticDescriptions[entry]}</small></span></button>`).join('')}</div>
       </section>
@@ -185,6 +201,7 @@ export function raceSetupScreen(game: GameState, eventId: EventId, tactic: Tacti
           ${carCard(car, { stats: true })}
           <button type="button" class="button button-primary" data-action="start-race">${icon('races')} Start Race</button>` :
         `<p>Add a car to your garage to enter a race.</p><button type="button" class="button button-primary" data-action="nav-cases">Go to Cases</button>`}
+        ${competition ? '<button type="button" class="button button-secondary" data-action="nav-career">Back to Career</button>' : ''}
       </section>
     </div>
     ${races.length ? `<section class="race-history panel" aria-label="Recent races">
@@ -233,11 +250,12 @@ export function caseResultScreen(game: GameState, car: Car, caseId: CaseId) {
 type Race = NonNullable<GameState['pendingRace']>;
 
 export function raceAnimationScreen(race: Race, player: Car, opponent: Car) {
+  const competition = race.careerEventId && careerEvents[race.careerEventId];
   return `<section class="race-animation-screen" aria-labelledby="screen-title">
-    ${pageHeading('RACE IN PROGRESS', events[race.eventId].name, `Tactic: ${race.tactic}. Follow both cars through the race.`)}
+    ${pageHeading('RACE IN PROGRESS', competition ? escapeHtml(competition.name) : events[race.eventId].name, `Tactic: ${race.tactic}. Follow both cars through the race.`)}
     <div class="race-lanes">
       ${([['player', player, 'Your car'], ['opponent', opponent, 'Rival']] as const).map(([lane, car, label]) => `<article class="race-lane panel">
-        <p class="eyebrow">${label}</p>${carCard(car)}
+        <p class="eyebrow">${lane === 'opponent' && competition ? escapeHtml(competition.rivalName) : label}</p>${carCard(car)}
         <div class="progress-track" role="progressbar" aria-label="${label} race progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-progress="${lane}"><div class="progress-fill"></div></div>
         <span class="progress-value" data-percent="${lane}" aria-hidden="true">0%</span>
       </article>`).join('')}
@@ -247,20 +265,24 @@ export function raceAnimationScreen(race: Race, player: Car, opponent: Car) {
 }
 
 export function raceResultScreen(race: Race, player: Car, opponent: Car) {
+  const competition = race.careerEventId && careerEvents[race.careerEventId];
+  const eventName = competition ? escapeHtml(competition.name) : events[race.eventId].name;
   return `<section class="race-result-screen" aria-labelledby="screen-title">
-    ${pageHeading('FINISH LINE', 'Race Results', `${events[race.eventId].name} · ${race.tactic} tactic`)}
+    ${pageHeading('FINISH LINE', 'Race Results', `${eventName} · ${race.tactic} tactic`)}
     <section class="race-result panel">
       <div class="result-summary">
         <div><p class="eyebrow">${race.won ? 'WIN' : 'LOSS'}</p><h2>${race.won ? 'Victory' : 'Defeat'}</h2></div>
         <span class="reward-badge">${icon('coin')} +${money(race.reward)} coins</span>
       </div>
+      ${race.careerAward ? careerAward(race.careerAward) : ''}
       <p class="result-explanation">${escapeHtml(race.explanation)}</p>
       <div class="result-scores">
         <article>${carCard(player)}<p>Your score <strong>${race.playerScore.toFixed(2)}</strong></p></article>
-        <article>${carCard(opponent)}<p>Rival score <strong>${race.opponentScore.toFixed(2)}</strong></p></article>
+        <article>${carCard(opponent)}<p>${competition ? escapeHtml(competition.rivalName) + ' score' : 'Rival score'} <strong>${race.opponentScore.toFixed(2)}</strong></p></article>
       </div>
       <div class="button-row">
         <button type="button" class="button button-primary" data-action="race-again">Race Again</button>
+        ${competition ? '<button type="button" class="button button-secondary" data-action="race-career">Back to Career</button>' : ''}
         <button type="button" class="button button-secondary" data-action="race-cases">Go to Cases</button>
         <button type="button" class="button button-secondary" data-action="race-garage">Go to Garage</button>
       </div>
