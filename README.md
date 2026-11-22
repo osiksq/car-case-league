@@ -13,6 +13,8 @@ npm run dev
 
 Open [localhost:5173/car-case-league/](http://localhost:5173/car-case-league/). The first Rookie Case is free. Keep the car, run a Drag or Circuit race, then use the reward to open another case. Progress is stored in the current browser.
 
+The development server shows **DEV** next to Settings. It can temporarily waive case costs without debiting the wallet, add test coins, or reset development progress. The switch starts off on each page load. Development uses a separate save, and the built game served by `npm run preview` uses the release save.
+
 ## Build and test
 
 ```sh
@@ -22,7 +24,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Playwright starts a server for the production build under the same base path used by GitHub Pages. To explore that build manually, run `npm run preview` and open [localhost:4173/car-case-league/](http://localhost:4173/car-case-league/).
+Playwright checks the production build under the GitHub Pages base path and runs the developer tools tests against a separate Vite development server. To explore the production build manually, run `npm run preview` and open [localhost:4173/car-case-league/](http://localhost:4173/car-case-league/).
 
 ## Publish a demo
 

@@ -11,6 +11,7 @@ const iconPaths = {
   lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 1 1 8 0v3"/>',
   check: '<path d="m5 12 4 4L19 6"/>',
   bolt: '<path d="m13 2-8 12h7l-1 8 8-12h-7l1-8Z"/>',
+  crest: '<path d="m3 7 4 3 5-6 5 6 4-3-2 11H5L3 7Zm3 8h12"/>',
 };
 
 const statNames: Record<Stat, string> = {
@@ -77,6 +78,6 @@ export function carCard(car: Car, options: { actions?: string; stats?: boolean; 
 
 export function oddsTable(odds: Record<Rarity, number>) {
   return `<ul class="odds-list">${rarities.map((rarity) =>
-    `<li>${rarityBadge(rarity)}<span class="odds-percent">${odds[rarity]}%</span></li>`
+    `<li${odds[rarity] === 0 ? ' class="odds-unavailable"' : ''}>${rarityBadge(rarity)}<span class="odds-percent">${odds[rarity]}%</span></li>`
   ).join('')}</ul>`;
 }

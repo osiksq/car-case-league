@@ -1,12 +1,19 @@
 import {
-  cars, classes, economy, events, rarities, rookieOdds, starterOdds, tactics,
+  cars, classes, events, rarities, tactics,
   type Car, type EventId, type Tactic,
 } from '../game/config';
+import { caseIds, casePool, casePrice, cases, type CaseId } from '../game/cases';
 import type { GameState } from '../game/save';
 import { carCard, carImage, carStyle, carStats, escapeHtml, icon, money, oddsTable, pageHeading, rarityBadge, statEntries } from './components';
 
 export const carsById = new Map(cars.map((car) => [car.id, car]));
-const featuredCar = cars.find((car) => car.artIndex === 7) ?? cars[0];
+
+const caseArtwork = {
+  rookie: { badge: 'logo', featuredCarId: 'merovar-sprint' },
+  street: { badge: 'bolt', featuredCarId: 'thalven-gt' },
+  performance: { badge: 'races', featuredCarId: 'kairox-r' },
+  elite: { badge: 'crest', featuredCarId: 'orvane-eclipse' },
+} as const satisfies Record<CaseId, { badge: Parameters<typeof icon>[0]; featuredCarId: string }>;
 
 export type GarageSort = 'recent' | 'rarity' | 'name' | 'speed';
 
@@ -33,46 +40,70 @@ function option(value: string, label: string, current: string) {
   return `<option value="${escapeHtml(value)}"${value === current ? ' selected' : ''}>${escapeHtml(label)}</option>`;
 }
 
-export function casesScreen(game: GameState) {
-  const free = game.progress.casesOpened === 0;
-  return `<section class="case-screen" aria-labelledby="screen-title">
-    ${pageHeading('CASE OPENER', 'Cases', 'Open a case, build your garage and find your next race winner.')}
+export function casesScreen(game: GameState, activeCase: CaseId, canOpen: boolean) {
+  const selected = cases[activeCase];
+  const price = casePrice(activeCase, game.progress.casesOpened);
+  const free = price === 0;
+  const pool = casePool(activeCase);
+  const artwork = caseArtwork[activeCase];
+  const featuredCar = pool.find(({ id }) => id === artwork.featuredCarId) ?? pool[0];
+  return `<section class="case-screen" data-case-theme="${activeCase}" aria-labelledby="screen-title">
+    <header class="case-header">
+      <h1 id="screen-title" tabindex="-1">Cases</h1>
+      <dl class="case-stats" aria-label="Your progress">
+        <div><dt>In garage</dt><dd>${game.garage.length}</dd></div>
+        <div><dt>Cases opened</dt><dd>${game.progress.casesOpened}</dd></div>
+        <div><dt>Races finished</dt><dd>${game.progress.racesCompleted}</dd></div>
+      </dl>
+    </header>
+    <div class="case-selector" role="group" aria-label="Select a case">
+      ${caseIds.map((id) => `<button class="case-option" type="button" data-action="select-case" data-id="${id}"
+        data-case-theme="${id}" aria-pressed="${id === activeCase}">
+        <span class="case-option-icon">${icon(caseArtwork[id].badge)}</span>
+        <span>${cases[id].name}</span>
+      </button>`).join('')}
+    </div>
     <div class="case-grid">
-      <article class="case-feature panel">
-        <div class="case-art">${carImage(featuredCar, true)}</div>
-        <div class="case-content">
-          <div class="badges">${free ? '<span class="status-badge">FIRST CASE FREE</span>' : ''}</div>
-          <h2>Rookie Case</h2>
-          <p>From budget builds to exotic machines. Every pull adds a car to your garage.</p>
-          <div class="button-row">
-            <button type="button" class="button button-primary" data-action="open-case"${!free && game.coins < economy.casePrice ? ' disabled' : ''}>
-              ${icon('cases')} ${free ? 'Open Free Case' : 'Open Case'}
-            </button>
-            <span class="case-price">${icon('coin')} ${free ? 'Free' : `${money(economy.casePrice)} coins`}</span>
+      <article class="case-feature panel" aria-labelledby="selected-case-title">
+        <div class="case-stage" aria-hidden="true">
+          <div class="case-crate">
+            <span class="case-crate-lid"></span>
+            <span class="case-crate-face">
+              <span class="case-crate-plate">${icon(artwork.badge)}</span>
+            </span>
           </div>
-          ${!free && game.coins < economy.casePrice ? '<p class="action-hint">Race to earn more coins.</p>' : ''}
+        </div>
+        <div class="case-content">
+          <h2 id="selected-case-title">${selected.name}</h2>
+          <button type="button" class="button button-primary case-open-button" data-action="open-case"${free ? '' : ' aria-describedby="selected-case-price"'}${canOpen ? '' : ' disabled'}>
+            ${icon('cases')} ${free ? 'Open Free Case' : 'Open Case'}
+          </button>
+          ${free ? '' : `<span class="case-price" id="selected-case-price">${icon('coin')} ${money(price)} coins</span>`}
+          ${canOpen ? '' : '<p class="action-hint">Race to earn more coins.</p>'}
         </div>
       </article>
       <aside class="case-sidebar">
         <section class="odds-panel panel" aria-labelledby="odds-title">
           <div class="panel-heading"><h2 id="odds-title">Drop odds</h2><span>Per case</span></div>
-          ${oddsTable(free ? starterOdds : rookieOdds)}
+          ${oddsTable(selected.odds)}
           <p class="odds-note">Cars have equal odds within each rarity.</p>
         </section>
-        <section class="progress-panel panel" aria-labelledby="progress-title">
-          <div class="panel-heading"><h2 id="progress-title">Your progress</h2></div>
-          <dl class="progress-list">
-            <div><dt>In garage</dt><dd>${game.garage.length}</dd></div>
-            <div><dt>Cases opened</dt><dd>${game.progress.casesOpened}</dd></div>
-            <div><dt>Races finished</dt><dd>${game.progress.racesCompleted}</dd></div>
-          </dl>
+        <section class="case-preview panel" aria-labelledby="case-preview-title">
+          <div class="case-preview-art">${carImage(featuredCar)}</div>
+          <div class="case-preview-details">
+            <p id="case-preview-title">Featured drop</p>
+            <h2>${escapeHtml(featuredCar.name)}</h2>
+            ${rarityBadge(featuredCar.rarity)}
+          </div>
         </section>
       </aside>
     </div>
-    <section class="catalog-section" aria-labelledby="pool-title">
-      <div class="section-heading"><div><h2 id="pool-title">Vehicle Pool</h2><p>The cars available in the Rookie Case.</p></div><span>${cars.length} vehicles</span></div>
-      <div class="card-grid">${cars.map((car) => carCard(car)).join('')}</div>
-    </section>
+    <details class="catalog-section panel">
+      <summary class="catalog-summary">
+        ${icon('garage')} <strong>Vehicle Pool</strong><span>${pool.length} vehicles</span>
+      </summary>
+      <div class="card-grid">${pool.map((car) => carCard(car)).join('')}</div>
+    </details>
   </section>`;
 }
 
@@ -163,15 +194,12 @@ export function raceSetupScreen(game: GameState, eventId: EventId, tactic: Tacti
   </section>`;
 }
 
-export function caseAnimationScreen(car: Car) {
-  const alternatives = cars.filter((candidate) => candidate.id !== car.id);
-  const reel = [...alternatives, ...alternatives.slice(3), car, ...alternatives.slice(0, 6)];
-  const winnerIndex = alternatives.length * 2 - 3;
-  return `<section class="opening-screen" aria-labelledby="screen-title">
-    ${pageHeading('ROOKIE CASE', 'Opening Case', 'The car is already drawn. The reel brings it into view.')}
+export function caseAnimationScreen(caseId: CaseId, { entries, winnerIndex }: { entries: Car[]; winnerIndex: number }) {
+  return `<section class="opening-screen" data-case-theme="${caseId}" aria-labelledby="screen-title">
+    ${pageHeading(cases[caseId].name, 'Opening Case', 'The reward is already drawn. The reel is a visual reveal.')}
     <section class="roulette-panel panel" aria-label="Case opening animation">
       <div class="roulette-viewport" aria-hidden="true">
-        <div class="roulette-track">${reel.map((entry, index) => `<div class="roulette-card ${carStyle(entry)}"${index === winnerIndex ? ' data-reel-winner' : ''}>
+        <div class="roulette-track">${entries.map((entry, index) => `<div class="roulette-card ${carStyle(entry)}" data-car-id="${escapeHtml(entry.id)}"${index === winnerIndex ? ' data-reel-winner' : ''}>
           <div class="roulette-art">${carImage(entry, true)}</div><strong>${escapeHtml(entry.name)}</strong>${rarityBadge(entry.rarity)}
         </div>`).join('')}</div>
         <div class="roulette-marker"></div>
@@ -181,12 +209,12 @@ export function caseAnimationScreen(car: Car) {
   </section>`;
 }
 
-export function caseResultScreen(game: GameState, car: Car) {
+export function caseResultScreen(game: GameState, car: Car, caseId: CaseId) {
   const owned = game.garage.find((entry) => entry.id === game.pendingCase);
   const canSell = game.garage.length > 1 && owned && !owned.locked;
-  return `<section class="case-result-screen" aria-labelledby="screen-title">
-    ${pageHeading('ROOKIE CASE', 'Case Result', 'Your new car is already saved to your garage.')}
-    <article class="case-result panel ${carStyle(car)}">
+  return `<section class="case-result-screen" data-case-theme="${caseId}" aria-labelledby="screen-title">
+    ${pageHeading(cases[caseId].name, 'Case Result', 'Your new car is already saved to your garage.')}
+    <article class="case-result panel ${carStyle(car)}" data-car-id="${escapeHtml(car.id)}">
       <div class="case-result-art">${carImage(car, true)}</div>
       <div class="case-result-content">
         <div class="badges">${rarityBadge(car.rarity)}<span class="car-class">${car.class}</span></div>

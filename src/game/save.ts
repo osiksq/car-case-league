@@ -1,5 +1,5 @@
-import { cars, economy, events, rarities, rookieOdds, starterOdds, tactics, type Car, type EventId, type Tactic } from './config';
-import { createRandom } from './random';
+import { cars, economy, events, tactics, type EventId, type Tactic } from './config';
+import { casePrice, cases, drawCaseReward, type CaseId } from './cases';
 import { simulateRace, type RacePhase, type RaceResult } from './race';
 
 export type { RaceResult } from './race';
@@ -7,7 +7,6 @@ export type { RaceResult } from './race';
 export const storageKey = 'car-case-league.save';
 const saveVersion = 1;
 const carById = new Map(cars.map((car) => [car.id, car]));
-const carsByRarity = new Map(rarities.map((rarity) => [rarity, cars.filter((car) => car.rarity === rarity)]));
 
 export interface OwnedCar {
   id: string;
@@ -23,6 +22,7 @@ export interface GameState {
   progress: { casesOpened: number; racesCompleted: number };
   races: RaceResult[];
   pendingCase: string | null;
+  pendingCaseType?: CaseId;
   pendingRace: RaceResult | null;
 }
 
@@ -49,28 +49,12 @@ function requireOwnedCar(state: GameState, id: string | null): OwnedCar {
   return car;
 }
 
-function chooseReward(first: boolean, seed?: number): Car {
-  const odds = first ? starterOdds : rookieOdds;
-  const random = createRandom(seed);
-  const roll = random() * 100;
-  let cumulative = 0;
-  for (const rarity of rarities) {
-    cumulative += odds[rarity];
-    if (roll >= cumulative) continue;
-    const pool = carsByRarity.get(rarity);
-    if (!pool?.length) throw new Error(`The ${rarity} reward pool is empty.`);
-    return pool[Math.floor(random() * pool.length)];
-  }
-  throw new Error('Rookie Case odds do not cover every roll.');
-}
-
-export function openCase(state: GameState, seed?: number): GameState {
+export function openCase(state: GameState, id: CaseId = 'rookie', seed?: number): GameState {
   requireIdle(state);
-  const first = state.progress.casesOpened === 0;
-  const price = first ? 0 : economy.casePrice;
+  const price = casePrice(id, state.progress.casesOpened);
   if (state.coins < price) throw new Error('You do not have enough coins for this case.');
   const casesOpened = state.progress.casesOpened + 1;
-  const reward = chooseReward(first, seed);
+  const reward = drawCaseReward(id, seed);
   const owned = { id: `car-${casesOpened}`, carId: reward.id, locked: false };
 
   // Commit the debit, ownership and pending reveal together before animation.
@@ -81,12 +65,14 @@ export function openCase(state: GameState, seed?: number): GameState {
     selectedId: state.selectedId ?? owned.id,
     progress: { ...state.progress, casesOpened },
     pendingCase: owned.id,
+    pendingCaseType: id,
   };
 }
 
 export function finishCase(state: GameState, action: 'keep' | 'sell'): GameState {
   if (!state.pendingCase) return state;
   const resolved = { ...state, pendingCase: null };
+  delete resolved.pendingCaseType;
   return action === 'sell' ? sellCar(resolved, state.pendingCase) : resolved;
 }
 
@@ -178,6 +164,11 @@ function isRaceResult(value: unknown): value is RaceResult {
     && Array.isArray(value.phases) && value.phases.length >= 2 && value.phases.every(isRacePhase);
 }
 
+function hasValidCaseMetadata(value: Record<string, unknown>): boolean {
+  return value.pendingCaseType === undefined || (value.pendingCase !== null
+    && typeof value.pendingCaseType === 'string' && Object.hasOwn(cases, value.pendingCaseType));
+}
+
 function isSave(value: unknown): value is GameState {
   if (!isObject(value) || value.version !== saveVersion || !isCount(value.coins)) return false;
   if (!isObject(value.progress) || !isCount(value.progress.casesOpened) || !isCount(value.progress.racesCompleted)) return false;
@@ -189,6 +180,7 @@ function isSave(value: unknown): value is GameState {
   if (casesOpened > 0 && value.garage.length === 0) return false;
   if (value.garage.length ? typeof value.selectedId !== 'string' || !garageIds.has(value.selectedId) : value.selectedId !== null) return false;
   if (value.pendingCase !== null && (typeof value.pendingCase !== 'string' || !garageIds.has(value.pendingCase))) return false;
+  if (!hasValidCaseMetadata(value)) return false;
   if (value.races.length !== racesCompleted || value.races.some(({ id }, index) => id !== `race-${index + 1}`)) return false;
   return value.pendingRace === null || (value.pendingCase === null && isRaceResult(value.pendingRace)
     && value.pendingRace.id === value.races.at(-1)?.id);
@@ -202,9 +194,10 @@ function parseSave(raw: string | null): unknown {
   }
 }
 
-export function readSave(storage: Pick<Storage, 'getItem'>): GameState {
+export function readSave(storage: Pick<Storage, 'getItem'>, key = storageKey): GameState {
   try {
-    const value = parseSave(storage.getItem(storageKey));
+    const value = parseSave(storage.getItem(key));
+    if (isObject(value) && !hasValidCaseMetadata(value)) delete value.pendingCaseType;
     if (!isSave(value)) return createGame();
     return value.pendingRace ? { ...value, pendingRace: value.races.at(-1) ?? null } : value;
   } catch {
@@ -212,10 +205,14 @@ export function readSave(storage: Pick<Storage, 'getItem'>): GameState {
   }
 }
 
-export function writeSave(storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, 'getItem'>>, state: GameState): void {
-  const existing = parseSave(storage.getItem?.(storageKey) ?? null);
+export function writeSave(
+  storage: Pick<Storage, 'setItem'> & Partial<Pick<Storage, 'getItem'>>,
+  state: GameState,
+  key = storageKey,
+): void {
+  const existing = parseSave(storage.getItem?.(key) ?? null);
   if (isObject(existing) && isCount(existing.version) && existing.version > saveVersion) {
     throw new Error('This save belongs to a newer version of Car Case League.');
   }
-  storage.setItem(storageKey, JSON.stringify(state));
+  storage.setItem(key, JSON.stringify(state));
 }

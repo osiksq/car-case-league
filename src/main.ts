@@ -1,5 +1,7 @@
 import './style.css';
+import { buildCaseReel, caseIds, casePrice, type CaseId } from './game/cases';
 import { events, tactics, type EventId, type Tactic } from './game/config';
+import { addDeveloperCoins, developerButton, developerDialog, developerSaveKey, openDeveloperCase } from './dev/developer';
 import {
   createGame, finishCase, finishRace, openCase, readSave, selectCar, sellCar,
   startRace, storageKey, toggleLock, writeSave, type GameState,
@@ -21,12 +23,15 @@ type Visual = 'case' | 'race' | null;
 type Command = (latest: GameState) => GameState;
 type RestoreFocus = { action: string; id?: string } | { filter: string };
 
-const motionKey = 'car-case-league.reduce-motion';
+const activeSaveKey = import.meta.env.DEV ? developerSaveKey : storageKey;
+const motionKey = import.meta.env.DEV ? 'car-case-league.reduce-motion.dev' : 'car-case-league.reduce-motion';
 const mediaMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const defaultFilters: GarageFilters = { sort: 'recent', rarity: '', carClass: '' };
 
 let game = createGame();
 let screen: Screen = 'cases';
+let selectedCase: CaseId = 'rookie';
+let caseReel: ReturnType<typeof buildCaseReel> | null = null;
 let eventId: EventId = 'drag';
 let tactic: Tactic = 'Balanced';
 let filters = { ...defaultFilters };
@@ -35,9 +40,12 @@ let stopAnimation = () => {};
 let notice = '';
 let commandPending = false;
 let motionPreference = false;
+let infiniteMoney = false;
+let renderedView = '';
 
 try {
-  game = readSave(localStorage);
+  game = readSave(localStorage, activeSaveKey);
+  selectedCase = game.pendingCaseType ?? selectedCase;
   motionPreference = localStorage.getItem(motionKey) === 'true';
 } catch {
   notice = 'Local storage is unavailable. Enable storage to play and save your progress.';
@@ -51,7 +59,12 @@ function gameScreen() {
   if (game.pendingCase) {
     const owned = game.garage.find((entry) => entry.id === game.pendingCase);
     const car = owned && carsById.get(owned.carId);
-    if (car) return animation === 'case' ? caseAnimationScreen(car) : caseResultScreen(game, car);
+    const caseId = game.pendingCaseType ?? 'rookie';
+    if (car) {
+      return animation === 'case' && caseReel
+        ? caseAnimationScreen(caseId, caseReel)
+        : caseResultScreen(game, car, caseId);
+    }
   }
   if (game.pendingRace) {
     const race = game.pendingRace;
@@ -64,12 +77,14 @@ function gameScreen() {
   switch (screen) {
     case 'garage': return garageScreen(game, filters);
     case 'races': return raceSetupScreen(game, eventId, tactic);
-    case 'cases': return casesScreen(game);
+    case 'cases':
+      return casesScreen(game, selectedCase,
+        game.coins >= casePrice(selectedCase, game.progress.casesOpened) || (import.meta.env.DEV && infiniteMoney));
   }
 }
 
 function dialogMarkup() {
-  return `<dialog class="settings-dialog panel" aria-labelledby="settings-title">
+  return `<dialog id="settings-dialog" class="settings-dialog panel" aria-labelledby="settings-title">
     <div class="panel-heading"><h2 id="settings-title">Settings</h2></div>
     <label class="motion-setting"><input type="checkbox" data-filter="motion"${reducedMotion() ? ' checked' : ''}${mediaMotion.matches ? ' disabled' : ''}> Reduce Motion</label>
     ${mediaMotion.matches ? '<p class="action-hint">Your device has requested reduced motion.</p>' : ''}
@@ -86,32 +101,39 @@ function render(focus?: 'heading' | RestoreFocus) {
   stopAnimation = () => {};
   document.documentElement.classList.toggle('reduced-motion', reducedMotion());
   const activeScreen: Screen = game.pendingCase ? 'cases' : game.pendingRace ? 'races' : screen;
+  const view = game.pendingCase || game.pendingRace
+    ? `${activeScreen}:${animation ?? 'result'}`
+    : screen === 'cases' ? `cases:${selectedCase}` : screen;
+  const transition = view !== renderedView;
+  renderedView = view;
   const visibleWallet = animation === 'race' ? game.coins - (game.pendingRace?.reward ?? 0) : game.coins;
   app.innerHTML = `<div class="shell">
-    <header class="site-header">
+    <header class="site-header game-hud">
       <a class="skip-link" href="#main-content">Skip to content</a>
       <button class="brand" type="button" data-action="nav-cases" aria-label="Car Case League"${animation ? ' disabled' : ''}>
         <span class="brand-mark">${icon('logo')}</span>
         <span class="brand-name">Car Case <strong>League</strong></span>
       </button>
       <nav class="main-nav" aria-label="Main navigation">
-        ${(Object.keys(navigation) as Screen[]).map((page) => `<button type="button" data-action="nav-${page}"${activeScreen === page ? ' aria-current="page"' : ''}${animation ? ' disabled' : ''}>
-          ${icon(page)}<span>${navigation[page]}</span>
+        ${(Object.keys(navigation) as Screen[]).map((page) => `<button type="button" data-action="nav-${page}" aria-label="${navigation[page]}"${activeScreen === page ? ' aria-current="page"' : ''}${animation ? ' disabled' : ''}>
+          ${icon(page)}<span>${page === 'garage' ? 'Garage' : navigation[page]}</span>
         </button>`).join('')}
       </nav>
       <div class="header-actions">
         <div class="wallet" aria-label="Wallet">
           <span class="wallet-icon">${icon('coin')}</span>
-          <span class="wallet-label">Coins</span><strong class="wallet-value" data-testid="coin-balance">${money(visibleWallet)}</strong>
+          <span class="wallet-label">Coins</span><strong class="wallet-value" data-testid="coin-balance">${import.meta.env.DEV && infiniteMoney ? '∞' : money(visibleWallet)}</strong>
         </div>
         <button class="settings-button" type="button" data-action="settings" aria-label="Settings"${animation ? ' disabled' : ''}>${icon('settings')}</button>
+        ${import.meta.env.DEV ? developerButton(Boolean(animation)) : ''}
       </div>
     </header>
     <main class="main-content" id="main-content" tabindex="-1">
       ${notice ? `<p class="notice panel" role="alert">${escapeHtml(notice)}</p>` : ''}
-      ${gameScreen()}
+      <div${transition ? ' class="screen-transition"' : ''}>${gameScreen()}</div>
     </main>
     ${dialogMarkup()}
+    ${import.meta.env.DEV ? developerDialog(infiniteMoney) : ''}
   </div>`;
 
   if (focus === 'heading') {
@@ -132,6 +154,7 @@ function render(focus?: 'heading' | RestoreFocus) {
 
 function showResult() {
   animation = null;
+  caseReel = null;
   render('heading');
 }
 
@@ -139,21 +162,24 @@ async function transact(command: Command, onCommit: () => void, focus: 'heading'
   if (commandPending) return;
   commandPending = true;
   let latest: GameState | undefined;
+  let committed = false;
   const save = () => {
-    latest = readSave(localStorage);
+    latest = readSave(localStorage, activeSaveKey);
     const next = command(latest);
-    if (next !== latest) writeSave(localStorage, next);
+    if (next !== latest) writeSave(localStorage, next, activeSaveKey);
     game = next;
+    committed = true;
   };
 
   try {
-    if (navigator.locks) await navigator.locks.request(storageKey, save);
+    if (navigator.locks) await navigator.locks.request(activeSaveKey, save);
     else save();
     notice = '';
     onCommit();
   } catch (error) {
-    if (latest) game = latest;
+    if (!committed && latest) game = latest;
     animation = null;
+    caseReel = null;
     notice = error instanceof Error ? error.message : 'Could not save progress. Try again.';
   } finally {
     commandPending = false;
@@ -183,10 +209,18 @@ function dismissResult(next: Screen, action: 'keep' | 'sell' = 'keep') {
 
 function beginCase() {
   const opened = game.progress.casesOpened;
+  const caseId = selectedCase;
   void transact((latest) => {
     if (opened !== latest.progress.casesOpened) throw new Error('Progress changed in another tab. Review the current case.');
-    return openCase(latest);
-  }, () => { animation = reducedMotion() ? null : 'case'; });
+    return import.meta.env.DEV && infiniteMoney ? openDeveloperCase(latest, caseId) : openCase(latest, caseId);
+  }, () => {
+    const owned = game.garage.find((entry) => entry.id === game.pendingCase);
+    const reward = owned && carsById.get(owned.carId);
+    if (reward && !reducedMotion()) {
+      caseReel = buildCaseReel(caseId, reward);
+      animation = 'case';
+    }
+  });
 }
 
 function beginRace() {
@@ -200,15 +234,60 @@ function beginRace() {
   }, () => { animation = reducedMotion() ? null : 'race'; });
 }
 
+function resetProgress(message: string) {
+  if (!window.confirm(message)) return;
+  void transact(createGame, () => {
+    screen = 'cases';
+    selectedCase = 'rookie';
+    eventId = 'drag';
+    tactic = 'Balanced';
+    filters = { ...defaultFilters };
+    if (import.meta.env.DEV) infiniteMoney = false;
+  });
+}
+
+function openDeveloperPanel(focus?: 'dev-money' | 'dev-add-coins') {
+  const panel = app.querySelector<HTMLDialogElement>('.dev-dialog');
+  panel?.showModal();
+  if (focus) panel?.querySelector<HTMLElement>(`[data-action="${focus}"]`)?.focus();
+}
+
 function handleAction(button: HTMLButtonElement) {
   const action = button.dataset.action ?? '';
   const id = button.dataset.id;
   if (animation && action !== 'skip') return;
 
+  if (import.meta.env.DEV) {
+    switch (action) {
+      case 'dev-tools': openDeveloperPanel(); return;
+      case 'dev-close': app.querySelector<HTMLDialogElement>('.dev-dialog')?.close(); return;
+      case 'dev-money':
+        infiniteMoney = !infiniteMoney;
+        render({ action: 'dev-tools' });
+        openDeveloperPanel('dev-money');
+        return;
+      case 'dev-add-coins':
+        void transact(addDeveloperCoins, () => {}, { action: 'dev-tools' })
+          .then(() => openDeveloperPanel('dev-add-coins'));
+        return;
+      case 'dev-reset':
+        resetProgress('Reset Car Case League development progress on this device?');
+        return;
+    }
+  }
+
   switch (action) {
     case 'nav-cases': changeScreen('cases'); break;
     case 'nav-garage': changeScreen('garage'); break;
     case 'nav-races': changeScreen('races'); break;
+    case 'select-case': {
+      const choice = caseIds.find((candidate) => candidate === id);
+      if (!choice || choice === selectedCase) break;
+      selectedCase = choice;
+      notice = '';
+      render({ action, id });
+      break;
+    }
     case 'open-case': beginCase(); break;
     case 'start-race': beginRace(); break;
     case 'skip': showResult(); break;
@@ -243,17 +322,12 @@ function handleAction(button: HTMLButtonElement) {
     case 'sell-car':
       if (id) void transact((latest) => sellCar(latest, id), () => {}, { action: 'select-car', id });
       break;
-    case 'settings': app.querySelector('dialog')?.showModal(); break;
-    case 'close-settings': app.querySelector('dialog')?.close(); break;
+    case 'settings': app.querySelector<HTMLDialogElement>('#settings-dialog')?.showModal(); break;
+    case 'close-settings': app.querySelector<HTMLDialogElement>('#settings-dialog')?.close(); break;
     case 'reset':
-      if (window.confirm('Reset all Car Case League progress on this device?')) {
-        void transact(createGame, () => {
-          screen = 'cases';
-          eventId = 'drag';
-          tactic = 'Balanced';
-          filters = { ...defaultFilters };
-        });
-      }
+      resetProgress(import.meta.env.DEV
+        ? 'Reset Car Case League development progress on this device?'
+        : 'Reset all Car Case League progress on this device?');
       break;
   }
 }
@@ -291,10 +365,12 @@ app.addEventListener('change', (event) => {
 });
 
 window.addEventListener('storage', (event) => {
-  if ((event.key !== storageKey && event.key !== null) || commandPending) return;
+  if ((event.key !== activeSaveKey && event.key !== null) || commandPending) return;
   try {
-    game = readSave(localStorage);
+    game = readSave(localStorage, activeSaveKey);
+    selectedCase = game.pendingCaseType ?? selectedCase;
     animation = null;
+    caseReel = null;
     render();
   } catch {
     notice = 'Progress could not be read from local storage.';

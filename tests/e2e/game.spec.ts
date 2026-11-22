@@ -88,6 +88,14 @@ test('refreshing a free reveal or race animation preserves its single award', as
 test('layout fits the viewport including on mobile', async ({ page }) => {
   await page.goto('./');
   await expect(page.getByRole('button', { name: 'Open Free Case', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Cases', exact: true })).toHaveAttribute('aria-current', 'page');
+  const pool = page.locator('details').filter({ has: page.getByText('Vehicle Pool', { exact: true }) });
+  await expect(pool).toHaveJSProperty('open', false);
+  await pool.locator('summary').click();
+  await expect(pool).toHaveJSProperty('open', true);
+  await expect(pool.locator('article')).toHaveCount(6);
+  await pool.locator('article').last().scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('coin-balance')).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     page.viewportSize()!.width,
   );
