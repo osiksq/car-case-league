@@ -1,6 +1,6 @@
 {
   "name": "car-case-league",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "engines": { "node": ">=22.12.0" },
@@ -9,7 +9,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "simulate:economy": "node scripts/economy-simulation.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

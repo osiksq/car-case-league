@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { cars, economy, events, rarities, stats, tacticModifiers } from '../src/game/config';
-import { buildCaseReel, caseIds, casePool, casePrice, cases } from '../src/game/cases';
+import { cars, events, rarities, stats, tacticModifiers } from '../src/game/config';
+import { buildCaseReel, caseIds, casePool, casePrice, cases, drawCaseReward } from '../src/game/cases';
+import { economy } from '../src/game/economy';
 import {
   createGame,
   finishCase,
   finishRace,
+  junkyardRemainingMs,
   openCase,
   readSave,
   selectCar,
@@ -24,79 +26,123 @@ function memoryStorage() {
 }
 
 function starter() {
-  return finishCase(openCase(createGame(), 'rookie', 12), 'keep');
+  return finishCase(openCase(createGame(), 'junkyard', 12, 100_000), 'keep');
 }
 
-describe('Rookie Case', () => {
-  it('grants one selected starter for free and rejects a second case before a race', () => {
+describe('Junkyard and paid cases', () => {
+  it('opens a free selected starter, persists the timestamp, and waits 60 seconds across reload', () => {
+    const storage = memoryStorage();
     const fresh = createGame();
-    const opened = openCase(fresh, 'rookie', 12);
-
+    const opened = openCase(fresh, 'junkyard', 12, 100_000);
     expect(opened.coins).toBe(fresh.coins);
     expect(opened.garage).toHaveLength(1);
     expect(opened.selectedId).toBe(opened.garage[0].id);
     expect(opened.pendingCase).toBe(opened.garage[0].id);
-    expect(opened.pendingCaseType).toBe('rookie');
+    expect(opened.pendingCaseType).toBe('junkyard');
     expect(fresh.garage).toEqual([]);
-    expect(() => openCase(opened, 'rookie', 12)).toThrow();
-    expect(() => openCase(finishCase(opened, 'keep'), 'rookie', 12)).toThrow(/coins/i);
+    expect(() => openCase(opened, 'junkyard', 12, 100_000)).toThrow(/finish/i);
+    writeSave(storage, finishCase(opened, 'keep'));
+    const restored = readSave(storage);
+    expect(() => openCase(restored, 'junkyard', 12, 159_999)).toThrow(/ready in/i);
+    expect(openCase(restored, 'junkyard', 12, 160_000).garage).toHaveLength(2);
   });
 
-  it('offers a second case after the first race even on a loss', () => {
-    const game = starter();
-    const loss = Array.from({ length: 50 }, (_, seed) => startRace(game, 'drag', 'Balanced', seed))
-      .find((result) => !result.pendingRace?.won);
-    expect(loss).toBeDefined();
-    if (!loss) throw new Error('Expected at least one loss in the seeded fixtures');
-
-    const opened = openCase(finishRace(loss), 'rookie', 12);
-    expect(loss.pendingRace?.reward).toBe(economy.lossReward);
-    expect(opened.coins).toBe(loss.coins - cases.rookie.price);
-    expect(opened.coins).toBeGreaterThanOrEqual(0);
-    expect(opened.garage).toHaveLength(2);
+  it('keeps the case price fixed and rejects paid entry without enough coins', () => {
+    expect(caseIds.map(casePrice)).toEqual([0, 250, 700, 2000, 5500, 9000, 16000, 30000]);
+    expect(() => openCase(createGame(), 'rookie', 12, 100_000)).toThrow(/coins/i);
   });
 
-  it('charges other cases even before opening the first Rookie', () => {
-    expect(casePrice('rookie', 0)).toBe(0);
-    expect(casePrice('street', 0)).toBe(240);
-    expect(casePrice('performance', 0)).toBe(420);
-    expect(casePrice('elite', 0)).toBe(700);
-    expect(() => openCase(createGame(), 'street', 12)).toThrow(/coins/i);
-    expect(casePrice('rookie', 1)).toBe(120);
+  it('keeps the exact first-case tiers and excludes cars that cannot clear Rookie', () => {
+    const ids = new Set(casePool('junkyard', true).map((car) => car.id));
+    expect(ids).toEqual(new Set(['bravik-110', 'petrel-s1', 'merovar-sprint']));
+    let uncommon = 0;
+    const draws = 12_000;
+    for (let seed = 0; seed < draws; seed++) {
+      const game = openCase(createGame(), 'junkyard', seed, 100_000);
+      const rewardId = game.garage[0].carId;
+      if (rewardId === 'merovar-sprint') uncommon++;
+      if (!ids.has(rewardId)) throw new Error(`Ineligible starter: ${rewardId}`);
+    }
+    expect(Math.abs(uncommon / draws - 0.05)).toBeLessThan(0.01);
+    for (const winner of casePool('junkyard', true)) {
+      const reel = buildCaseReel('junkyard', winner, 12, true);
+      expect(reel.entries[reel.winnerIndex]).toBe(winner);
+      expect(reel.entries.every((car) => ids.has(car.id))).toBe(true);
+    }
+  });
+
+  it('keeps cooldown when the clock rolls back, then recovers without a long lockout', () => {
+    const storage = memoryStorage();
+    const game = finishCase(openCase(createGame(), 'junkyard', 12, 1_000_000), 'keep');
+    writeSave(storage, game);
+    expect(junkyardRemainingMs(game, 999_999)).toBe(economy.junkyardCooldownMs);
+    const resetClock = 100_000;
+    const rebased = readSave(storage, storageKey, resetClock + 10_000, resetClock);
+    expect(junkyardRemainingMs(rebased, resetClock + 10_000)).toBe(50_000);
+    // Re-reading the same snapshot uses the same page clock baseline.
+    const readyAt = resetClock + economy.junkyardCooldownMs;
+    const ready = readSave(storage, storageKey, readyAt, resetClock);
+    expect(junkyardRemainingMs(ready, readyAt)).toBe(0);
+    expect(openCase(ready, 'junkyard', 12, readyAt).garage).toHaveLength(2);
   });
 });
-
 describe('case odds and visual reels', () => {
   const publishedOdds = {
-    rookie: [70, 25, 5, 0, 0, 0],
-    street: [35, 45, 18, 2, 0, 0],
-    performance: [0, 25, 45, 26, 4, 0],
-    elite: [0, 0, 20, 55, 24, 1],
+    junkyard: [95, 5, 0, 0, 0, 0],
+    rookie: [52, 30, 18, 0, 0, 0],
+    street: [18, 37, 32, 13, 0, 0],
+    sport: [0, 16, 52, 29, 3, 0],
+    performance: [0, 0, 25, 50, 25, 0],
+    heritage: [0, 0, 40, 42, 18, 0],
+    elite: [0, 0, 0, 65, 32, 3],
+    hyper: [0, 0, 0, 50, 42, 8],
   };
 
-  it('defines four distinct vehicle pools and exact odds totaling 100% each', () => {
-    expect(caseIds).toEqual(['rookie', 'street', 'performance', 'elite']);
+  it('defines eight distinct vehicle pools and exact odds totaling 100% each', () => {
+    expect(caseIds).toEqual(['junkyard', 'rookie', 'street', 'sport', 'performance', 'heritage', 'elite', 'hyper']);
     const pools = caseIds.map((id) => casePool(id).map((car) => car.id).sort().join(','));
-    expect(new Set(pools).size).toBe(4);
+    expect(new Set(pools).size).toBe(8);
+    expect(casePool('heritage').every((car) => car.class === 'Collector')).toBe(true);
     for (const id of caseIds) {
       const odds = rarities.map((rarity) => cases[id].odds[rarity]);
       expect(odds).toEqual(publishedOdds[id]);
       expect(odds.reduce((total, weight) => total + weight, 0)).toBe(100);
       const eligibleRarities = rarities.filter((_, index) => odds[index] > 0);
       expect(new Set(casePool(id).map((car) => car.rarity))).toEqual(new Set(eligibleRarities));
+      expect(new Set(cases[id].carIds)).toEqual(new Set(casePool(id).map((car) => car.id)));
     }
   });
 
-  it.each(['rookie', 'street', 'performance', 'elite'] as const)('%s draws only eligible vehicles at its real odds', (id) => {
+  it('distributes forty unique cars across the specified rarity mix and reachable pools', () => {
+    expect(cars).toHaveLength(40);
+    expect(new Set(cars.map((car) => car.id)).size).toBe(40);
+    expect(rarities.map((rarity) => cars.filter((car) => car.rarity === rarity).length)).toEqual([9, 8, 8, 7, 5, 3]);
+    expect(new Set(caseIds.flatMap((id) => casePool(id).map((car) => car.id)))).toEqual(new Set(cars.map((car) => car.id)));
+  });
+
+  it('gives paid cases strictly negative resale expectation', () => {
+    for (const id of caseIds) {
+      if (id === 'junkyard') continue;
+      const pool = casePool(id);
+      let expectedResale = 0;
+      for (const rarity of rarities) {
+        const tier = pool.filter((car) => car.rarity === rarity);
+        if (!tier.length) continue;
+        expectedResale += (cases[id].odds[rarity] / 100) * tier.reduce((sum, car) => sum + car.resaleValue, 0) / tier.length;
+      }
+      expect(expectedResale).toBeGreaterThan(0);
+      expect(expectedResale).toBeLessThan(casePrice(id));
+    }
+  });
+
+  it.each(caseIds)('%s draws only eligible vehicles at its real odds', (id) => {
     const sampleCount = 12_000;
     const counts = Object.fromEntries(rarities.map((rarity) => [rarity, 0]));
     const pool = new Map(casePool(id).map((car) => [car.id, car]));
-    const state = { ...starter(), coins: cases[id].price };
-
     for (let seed = 0; seed < sampleCount; seed++) {
-      const reward = openCase(state, id, seed).garage.at(-1);
-      const car = reward && pool.get(reward.carId);
-      if (!car) throw new Error(`Ineligible ${id} case reward: ${reward?.carId}`);
+      const reward = drawCaseReward(id, seed);
+      const car = pool.get(reward.id);
+      if (!car) throw new Error(`Ineligible ${id} case reward: ${reward.id}`);
       counts[car.rarity]++;
     }
 
@@ -159,7 +205,7 @@ describe('case odds and visual reels', () => {
 
 describe('garage', () => {
   it('protects the last car through both sale paths', () => {
-    const game = openCase(createGame(), 'rookie', 12);
+    const game = openCase(createGame(), 'junkyard', 12);
     expect(() => finishCase(game, 'sell')).toThrow(/last car/i);
     const kept = finishCase(game, 'keep');
     expect(() => sellCar(kept, kept.garage[0].id)).toThrow(/last car/i);
@@ -184,8 +230,8 @@ describe('garage', () => {
 describe('races', () => {
   it('reproduces the same result and phases with the same seed', () => {
     const ready = starter();
-    const raced = startRace(ready, 'circuit', 'Safe', 193);
-    expect(startRace(ready, 'circuit', 'Safe', 193)).toEqual(raced);
+    const raced = startRace(ready, 'circuit', 'Safe', 193, 100_000);
+    expect(startRace(ready, 'circuit', 'Safe', 193, 100_000)).toEqual(raced);
     expect(raced.pendingRace?.eventId).toBe('circuit');
     expect(raced.pendingRace?.explanation.length).toBeGreaterThan(20);
     expect(raced.races).toHaveLength(1);
@@ -259,8 +305,16 @@ describe('races', () => {
   it('prefers a distinct comparable rival and uses the same model when there is no match', () => {
     const game = starter();
     const ready = { ...game, garage: [{ ...game.garage[0], carId: 'bravik-110' }] };
-    expect(startRace(ready, 'drag', 'Balanced', 3).pendingRace?.opponentCarId).toBe('petrel-s1');
-    expect(startRace(ready, 'circuit', 'Balanced', 3).pendingRace?.opponentCarId).toBe('bravik-110');
+    const player = cars.find((car) => car.id === 'bravik-110')!;
+    for (const eventId of ['drag', 'circuit'] as const) {
+      const weights = events[eventId].weights;
+      const score = (car: typeof player) => stats.reduce((sum, stat) => sum + car.stats[stat] * weights[stat] / 100, 0);
+      const playerScore = score(player);
+      const eligible = cars.filter((car) => car.id !== player.id
+        && Math.abs(score(car) - playerScore) <= (score(car) + playerScore) / 100);
+      const opponentId = startRace(ready, eventId, 'Balanced', 3).pendingRace?.opponentCarId;
+      expect(eligible.length ? eligible.map((car) => car.id) : [player.id]).toContain(opponentId);
+    }
   });
 });
 
@@ -283,8 +337,10 @@ describe('versioned progress', () => {
 
   it('keeps a legacy Rookie save with a pending car outside the current Rookie pool', () => {
     const storage = memoryStorage();
+    const { timing: _timing, ...base } = createGame();
     const previous = {
-      ...createGame(),
+      ...base,
+      version: 1,
       garage: [{ id: 'car-1', carId: 'veldris-zenith', locked: true }],
       selectedId: 'car-1',
       coins: 260,
@@ -293,7 +349,7 @@ describe('versioned progress', () => {
     };
     storage.setItem(storageKey, JSON.stringify(previous));
     const restored = readSave(storage);
-    expect(restored).toEqual(previous);
+    expect(restored).toEqual({ ...previous, version: 2, timing: createGame().timing });
     expect(finishCase(restored, 'keep').garage).toEqual(previous.garage);
   });
 
@@ -345,7 +401,7 @@ describe('versioned progress', () => {
 
   it('does not overwrite a save from a newer game version', () => {
     const storage = memoryStorage();
-    const raw = JSON.stringify({ ...starter(), version: 2 });
+    const raw = JSON.stringify({ ...starter(), version: 3 });
     storage.setItem(storageKey, raw);
     expect(readSave(storage)).toEqual(createGame());
     expect(() => writeSave(storage, createGame())).toThrow(/newer version/i);

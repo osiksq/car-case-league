@@ -22,12 +22,6 @@ export interface Car {
   artIndex: number;
 }
 
-export const economy = {
-  startingCoins: 60,
-  winReward: 100,
-  lossReward: 60,
-};
-
 export const events: Record<EventId, { name: string; description: string; weights: CarStats }> = {
   drag: {
     name: 'Drag Race',
@@ -101,5 +95,117 @@ export const cars: readonly Car[] = [
   {
     id: 'orvane-eclipse', name: 'Orvane Eclipse', rarity: 'Mythic', class: 'Exotic',
     stats: { speed: 96, acceleration: 93, handling: 89, reliability: 74 }, resaleValue: 390, artIndex: 11,
+  },
+  {
+    id: 'dorvik-75', name: 'Dorvik 75', rarity: 'Common', class: 'Classic',
+    stats: { speed: 35, acceleration: 40, handling: 47, reliability: 62 }, resaleValue: 20, artIndex: 12,
+  },
+  {
+    id: 'talmor-pico', name: 'Talmor Pico', rarity: 'Common', class: 'Street',
+    stats: { speed: 28, acceleration: 45, handling: 58, reliability: 44 }, resaleValue: 22, artIndex: 13,
+  },
+  {
+    id: 'norwyn-kite', name: 'Norwyn Kite', rarity: 'Common', class: 'Street',
+    stats: { speed: 41, acceleration: 43, handling: 52, reliability: 46 }, resaleValue: 24, artIndex: 14,
+  },
+  {
+    id: 'velska-cargo', name: 'Velska Cargo', rarity: 'Common', class: 'Street',
+    stats: { speed: 31, acceleration: 35, handling: 42, reliability: 72 }, resaleValue: 16, artIndex: 15,
+  },
+  {
+    id: 'ruskell-120', name: 'Ruskell 120', rarity: 'Common', class: 'Classic',
+    stats: { speed: 39, acceleration: 44, handling: 38, reliability: 66 }, resaleValue: 18, artIndex: 16,
+  },
+  {
+    id: 'havrix-cabrio', name: 'Havrix Cabrio', rarity: 'Common', class: 'Classic',
+    stats: { speed: 34, acceleration: 37, handling: 60, reliability: 59 }, resaleValue: 26, artIndex: 17,
+  },
+  {
+    id: 'elden-boxer', name: 'Elden Boxer', rarity: 'Common', class: 'Muscle',
+    stats: { speed: 46, acceleration: 49, handling: 29, reliability: 53 }, resaleValue: 23, artIndex: 18,
+  },
+  {
+    id: 'narvik-rally', name: 'Narvik Rally', rarity: 'Uncommon', class: 'Sport',
+    stats: { speed: 48, acceleration: 55, handling: 72, reliability: 62 }, resaleValue: 43, artIndex: 19,
+  },
+  {
+    id: 'issara-twin', name: 'Issara Twin', rarity: 'Uncommon', class: 'Street',
+    stats: { speed: 51, acceleration: 60, handling: 58, reliability: 45 }, resaleValue: 37, artIndex: 20,
+  },
+  {
+    id: 'malkor-ss', name: 'Malkor SS', rarity: 'Uncommon', class: 'Muscle',
+    stats: { speed: 61, acceleration: 66, handling: 33, reliability: 48 }, resaleValue: 40, artIndex: 21,
+  },
+  {
+    id: 'vesryn-dune', name: 'Vesryn Dune', rarity: 'Uncommon', class: 'Sport',
+    stats: { speed: 58, acceleration: 53, handling: 54, reliability: 69 }, resaleValue: 34, artIndex: 22,
+  },
+  {
+    id: 'selaire-roadster', name: 'Selaire Roadster', rarity: 'Uncommon', class: 'Classic',
+    stats: { speed: 53, acceleration: 51, handling: 70, reliability: 56 }, resaleValue: 46, artIndex: 23,
+  },
+  {
+    id: 'ordane-sedan', name: 'Ordane Sedan', rarity: 'Uncommon', class: 'Street',
+    stats: { speed: 59, acceleration: 57, handling: 47, reliability: 74 }, resaleValue: 39, artIndex: 24,
+  },
+  {
+    id: 'tavren-cup', name: 'Tavren Cup', rarity: 'Rare', class: 'Track',
+    stats: { speed: 58, acceleration: 65, handling: 84, reliability: 56 }, resaleValue: 78, artIndex: 25,
+  },
+  {
+    id: 'karsen-v8', name: 'Karsen V8', rarity: 'Rare', class: 'Muscle',
+    stats: { speed: 75, acceleration: 77, handling: 40, reliability: 57 }, resaleValue: 76, artIndex: 26,
+  },
+  {
+    id: 'vossari-spyder', name: 'Vossari Spyder', rarity: 'Rare', class: 'Sport',
+    stats: { speed: 71, acceleration: 62, handling: 77, reliability: 59 }, resaleValue: 88, artIndex: 27,
+  },
+  {
+    id: 'aldoven-63', name: 'Aldoven 63', rarity: 'Rare', class: 'Collector',
+    stats: { speed: 66, acceleration: 61, handling: 68, reliability: 78 }, resaleValue: 95, artIndex: 28,
+  },
+  {
+    id: 'bellovar-mk2', name: 'Bellovar Mk II', rarity: 'Rare', class: 'Collector',
+    stats: { speed: 77, acceleration: 71, handling: 54, reliability: 52 }, resaleValue: 98, artIndex: 29,
+  },
+  {
+    id: 'cirven-sport', name: 'Cirven Sport', rarity: 'Rare', class: 'Sport',
+    stats: { speed: 63, acceleration: 73, handling: 72, reliability: 47 }, resaleValue: 72, artIndex: 30,
+  },
+  {
+    id: 'quorven-rs', name: 'Quorven RS', rarity: 'Epic', class: 'Track',
+    stats: { speed: 76, acceleration: 70, handling: 93, reliability: 74 }, resaleValue: 138, artIndex: 31,
+  },
+  {
+    id: 'ralvex-turbo', name: 'Ralvex Turbo', rarity: 'Epic', class: 'Muscle',
+    stats: { speed: 84, acceleration: 94, handling: 48, reliability: 55 }, resaleValue: 139, artIndex: 32,
+  },
+  {
+    id: 'solvara-sr6', name: 'Solvara SR6', rarity: 'Epic', class: 'Collector',
+    stats: { speed: 74, acceleration: 76, handling: 86, reliability: 69 }, resaleValue: 161, artIndex: 33,
+  },
+  {
+    id: 'melvane-gt1', name: 'Melvane GT1', rarity: 'Epic', class: 'Collector',
+    stats: { speed: 88, acceleration: 80, handling: 72, reliability: 62 }, resaleValue: 169, artIndex: 34,
+  },
+  {
+    id: 'ventari-s4', name: 'Ventari S4', rarity: 'Epic', class: 'Exotic',
+    stats: { speed: 85, acceleration: 75, handling: 77, reliability: 73 }, resaleValue: 152, artIndex: 35,
+  },
+  {
+    id: 'trevos-r90', name: 'Trevos R90', rarity: 'Legendary', class: 'Track',
+    stats: { speed: 85, acceleration: 83, handling: 98, reliability: 72 }, resaleValue: 242, artIndex: 36,
+  },
+  {
+    id: 'ardenza-proto', name: 'Ardenza Proto', rarity: 'Legendary', class: 'Collector',
+    stats: { speed: 94, acceleration: 89, handling: 75, reliability: 66 }, resaleValue: 260, artIndex: 37,
+  },
+  {
+    id: 'ikhara-gt', name: 'Ikhara GT', rarity: 'Legendary', class: 'Exotic',
+    stats: { speed: 90, acceleration: 94, handling: 68, reliability: 80 }, resaleValue: 237, artIndex: 38,
+  },
+  {
+    id: 'novaryn-zero', name: 'Novaryn Zero', rarity: 'Mythic', class: 'Exotic',
+    stats: { speed: 97, acceleration: 90, handling: 98, reliability: 67 }, resaleValue: 430, artIndex: 39,
   },
 ];

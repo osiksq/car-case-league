@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { caseIds, cases } from '../../src/game/cases';
 import { createGame } from '../../src/game/save';
 
 const releaseSaveKey = 'car-case-league.save';
@@ -26,7 +27,7 @@ test('infinite money grants cars without debiting the isolated wallet', async ({
   await expect(wallet).toHaveText('60');
   await openCase(page, true);
   await page.getByRole('button', { name: 'Keep', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Open Case', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Open Free Case', exact: true })).toBeDisabled();
 
   await developer.click();
   await expect(toggle).toHaveAttribute('aria-checked', 'false');
@@ -35,6 +36,7 @@ test('infinite money grants cars without debiting the isolated wallet', async ({
   await expect(wallet).toHaveText('∞');
   await panel.getByRole('button', { name: 'Close', exact: true }).click();
 
+  await page.getByRole('button', { name: 'Rookie Case', exact: true }).click();
   await openCase(page);
   await page.getByRole('button', { name: 'Keep', exact: true }).click();
   await openCase(page);
@@ -62,21 +64,22 @@ test('test credits use normal prices and reset requires confirmation', async ({ 
   await expect(wallet).toHaveText('10,060');
   await panel.getByRole('button', { name: 'Close', exact: true }).click();
 
+  await page.getByRole('button', { name: 'Rookie Case', exact: true }).click();
   await openCase(page);
-  await expect(wallet).toHaveText('9,940');
+  await expect(wallet).toHaveText('9,810');
   await page.getByRole('button', { name: 'Keep', exact: true }).click();
   await developer.click();
   const reset = panel.getByRole('button', { name: 'Reset Progress' });
   page.once('dialog', (dialog) => dialog.dismiss());
   await reset.click();
-  await expect(wallet).toHaveText('9,940');
+  await expect(wallet).toHaveText('9,810');
   page.once('dialog', (dialog) => dialog.accept());
   await reset.click();
   await expect(wallet).toHaveText('60');
   await expect(page.getByRole('button', { name: 'Open Free Case', exact: true })).toBeEnabled();
 });
 
-test('infinite money unlocks all four cases without debiting the wallet', async ({ page }) => {
+test('infinite money unlocks all eight cases without debiting the wallet', async ({ page }) => {
   await page.goto('./');
   const developer = page.getByRole('button', { name: 'DEV', exact: true });
   const panel = page.getByRole('dialog', { name: 'Developer Tools' });
@@ -84,9 +87,10 @@ test('infinite money unlocks all four cases without debiting the wallet', async 
   await panel.getByRole('switch', { name: 'Infinite Money' }).click();
   await panel.getByRole('button', { name: 'Close', exact: true }).click();
 
-  for (const [index, name] of ['Rookie Case', 'Street Case', 'Performance Case', 'Elite Case'].entries()) {
+  for (const id of caseIds) {
+    const { name } = cases[id];
     await page.getByRole('button', { name, exact: true }).click();
-    await openCase(page, index === 0);
+    await openCase(page, id === 'junkyard');
     await expect(page.locator('.case-result-screen .eyebrow')).toHaveText(new RegExp(name, 'i'));
     await page.getByRole('button', { name: 'Keep', exact: true }).click();
   }
@@ -97,5 +101,5 @@ test('infinite money unlocks all four cases without debiting the wallet', async 
   await expect(page.getByTestId('coin-balance')).toHaveText('60');
   await expect(page.getByRole('button', { name: 'Open Case', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'My Garage', exact: true }).click();
-  await expect(page.getByTestId('garage-car')).toHaveCount(4);
+  await expect(page.getByTestId('garage-car')).toHaveCount(8);
 });

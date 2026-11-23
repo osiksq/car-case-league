@@ -293,6 +293,16 @@ h3 { font-size: 1.11rem; line-height: 1.19; }
   --case-stripe-angle: 0deg;
 }
 
+[data-case-theme='junkyard'] {
+  --case-accent: #e8a874;
+  --case-metal: #795446;
+  --case-lid-angle: -24deg;
+  --case-crate-width: clamp(10rem, 31vw, 18rem);
+  --case-face-radius: 2px 2px 4px 4px;
+  --case-strap-inset: 18%;
+  --case-stripe-angle: -10deg;
+}
+
 [data-case-theme='street'] {
   --case-accent: #71ddff;
   --case-metal: #426b81;
@@ -300,6 +310,17 @@ h3 { font-size: 1.11rem; line-height: 1.19; }
   --case-crate-width: clamp(9.8rem, 28vw, 15.6rem);
   --case-face-radius: 8px 8px 17px 17px;
   --case-strap-inset: 6%;
+}
+
+[data-case-theme='sport'] {
+  --case-accent: #ff9c60;
+  --case-metal: #784a35;
+  --case-lid-angle: -32deg;
+  --case-crate-width: clamp(11rem, 35vw, 19rem);
+  --case-face-height: clamp(3.8rem, 10vw, 6rem);
+  --case-face-radius: 3px 3px 23px 23px;
+  --case-strap-inset: 7%;
+  --case-stripe-angle: 8deg;
 }
 
 [data-case-theme='performance'] {
@@ -313,6 +334,17 @@ h3 { font-size: 1.11rem; line-height: 1.19; }
   --case-stripe-angle: 32deg;
 }
 
+[data-case-theme='heritage'] {
+  --case-accent: #eee0bd;
+  --case-metal: #645d55;
+  --case-lid-angle: -13deg;
+  --case-crate-width: clamp(9.5rem, 28vw, 15rem);
+  --case-face-height: clamp(5.3rem, 13vw, 8.2rem);
+  --case-face-radius: 9px 9px 13px 13px;
+  --case-strap-inset: 9%;
+  --case-stripe-angle: 38deg;
+}
+
 [data-case-theme='elite'] {
   --case-accent: #ffce80;
   --case-metal: #79613b;
@@ -321,6 +353,17 @@ h3 { font-size: 1.11rem; line-height: 1.19; }
   --case-face-radius: 5px 5px 21px 21px;
   --case-strap-inset: 10%;
   --case-stripe-angle: -36deg;
+}
+
+[data-case-theme='hyper'] {
+  --case-accent: #ff879b;
+  --case-metal: #783750;
+  --case-lid-angle: -32deg;
+  --case-crate-width: clamp(11rem, 37vw, 21rem);
+  --case-face-height: clamp(4.2rem, 11vw, 6.6rem);
+  --case-face-radius: 4px 4px 19px 19px;
+  --case-strap-inset: 17%;
+  --case-stripe-angle: -51deg;
 }
 
 .case-screen { max-width: 1220px; margin-inline: auto; }
@@ -355,9 +398,9 @@ h3 { font-size: 1.11rem; line-height: 1.19; }
   min-width: 0;
   min-height: 46px;
   align-items: center;
-  justify-content: center;
+  justify-content: start;
   gap: .55rem;
-  padding: .28rem .55rem;
+  padding: .36rem clamp(.4rem, 1.2vw, 1rem);
   border: 1px solid transparent;
   border-radius: 8px;
   color: #bdc5cf;
@@ -366,6 +409,11 @@ h3 { font-size: 1.11rem; line-height: 1.19; }
   font-weight: 740;
   transition: background-color .18s, border-color .18s, color .18s;
 }
+
+.case-option-label { display: grid; gap: .12rem; min-width: 0; text-align: start; }
+.case-option-label strong { font-size: inherit; font-weight: 740; overflow-wrap: anywhere; }
+.case-option-label small { color: var(--muted); font-size: .69rem; font-weight: 550; font-variant-numeric: tabular-nums; }
+.case-option[aria-pressed='true'] .case-option-label small { color: inherit; }
 
 .case-option-icon {
   display: grid;
@@ -492,12 +540,25 @@ h3 { font-size: 1.11rem; line-height: 1.19; }
 }
 
 .case-crate-plate svg { width: 58%; height: 86%; }
+[data-case-theme='junkyard'] .case-crate-face { border-style: dashed; }
+[data-case-theme='junkyard'] .case-crate-plate { transform: rotate(-3deg); }
 [data-case-theme='street'] .case-crate-plate { border-radius: 12px; }
+[data-case-theme='sport'] .case-crate-plate { border-radius: 100px; }
 [data-case-theme='performance'] .case-crate-plate { border-radius: 1px 8px; }
+[data-case-theme='heritage'] .case-crate-face { background: var(--carbon); }
+[data-case-theme='heritage'] .case-crate-plate { border: 3px double color-mix(in srgb, var(--case-accent) 58%, var(--case-metal)); }
 [data-case-theme='elite'] .case-crate-plate {
   border-width: 2px;
   border-radius: 9px 9px 15px 15px;
   box-shadow: inset 0 0 0 3px #171a1b, 0 2px 5px #070a07d4;
+}
+[data-case-theme='hyper'] .case-crate-lid {
+  background: linear-gradient(90deg, transparent 12%, #ff879b55 30% 70%, transparent 88%),
+    linear-gradient(170deg, var(--case-metal), #291b2b 85%);
+}
+[data-case-theme='hyper'] .case-crate-plate {
+  border-radius: 10px 2px;
+  box-shadow: 0 0 17px #ff879b40, inset 0 0 16px #ff879b20;
 }
 
 .case-content {
@@ -535,6 +596,8 @@ h3 { font-size: 1.11rem; line-height: 1.19; }
 .case-content .action-hint { margin-top: 0; }
 .case-price { display: inline-flex; align-items: center; gap: .3rem; color: var(--muted); font-size: .84rem; }
 .case-price svg { color: var(--case-accent, var(--lime)); }
+.junkyard-status { display: grid; gap: .24rem; color: var(--muted); font-size: .76rem; }
+.junkyard-status [role='timer'] { color: var(--case-accent); font-size: .9rem; font-weight: 740; font-variant-numeric: tabular-nums; }
 .badges { display: flex; flex-wrap: wrap; align-items: center; gap: .46rem; }
 
 .case-sidebar { display: grid; align-content: start; gap: .7rem; }
@@ -753,6 +816,19 @@ select {
 .race-entry .button { justify-self: start; }
 .race-entry .car-art { aspect-ratio: 2.15; }
 .race-entry > p { color: var(--muted); }
+.race-payout {
+  display: grid;
+  gap: .42rem;
+  padding: .66rem .76rem;
+  border: 1px solid var(--border);
+  border-radius: .56rem;
+  background: #11151a;
+}
+.race-payout dl { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
+.race-payout dl > div { display: flex; flex-wrap: wrap; gap: .35rem; font-size: .82rem; }
+.race-payout dd { color: var(--lime); font-weight: 740; }
+.race-payout p { color: var(--muted); font-size: .77rem; line-height: 1.44; }
+.race-payout [role='timer'] { color: #dbe3ec; font-variant-numeric: tabular-nums; }
 .race-history { margin-top: 1rem; padding: .9rem 1.2rem; }
 .race-history ul { list-style: none; padding: 0; margin: .55rem 0 0; }
 .race-history li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .3rem .65rem; padding-block: .54rem; border-top: 1px solid var(--border); color: var(--muted); }
@@ -769,8 +845,10 @@ select {
 .result-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .55rem 1rem; }
 .result-summary h2 { font-size: clamp(1.8rem, 4.8vw, 2.8rem); }
 .reward-badge { display: inline-flex; align-items: center; gap: .36rem; padding: .47rem .65rem; border: 1px solid #667e37; border-radius: 7px; color: var(--lime); background: #232b16; font-size: .84rem; font-weight: 740; }
+.reward-badge-empty { border-color: var(--border); color: var(--muted); background: #171b21; }
 .race-result > :where(p, .button-row) { margin-top: .85rem; }
 .race-result > p { color: #c6cbd3; line-height: 1.54; }
+.race-result > .race-result-reward-note { color: var(--muted); font-size: .84rem; }
 .result-scores { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; margin-block: 1rem; }
 .result-scores > * { min-width: 0; padding: .8rem; border: 1px solid var(--border); border-radius: 9px; background: #191d22; }
 .result-scores > article > p { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .2rem .45rem; margin-top: .62rem; color: var(--muted); font-size: .83rem; }
@@ -896,8 +974,10 @@ dialog p { color: var(--muted); line-height: 1.52; }
   .case-header { flex-direction: column; align-items: start; gap: .55rem; }
   .case-stats { gap: .45rem; font-size: .72rem; }
   .case-stats > div + div { padding-left: .45rem; }
-  .case-selector { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .case-option { justify-content: start; padding-inline: .46rem; font-size: .8rem; }
+  .case-selector { gap: .24rem; }
+  .case-option { flex-direction: column; justify-content: center; gap: .26rem; padding: .34rem .11rem; font-size: .72rem; }
+  .case-option-label { text-align: center; }
+  .case-option-label small { font-size: .68rem; }
   .case-sidebar { grid-template-columns: 1fr; }
   .case-preview { grid-template-columns: minmax(0, .8fr) minmax(0, 1fr); }
   .case-preview-art img { max-height: 105px; object-fit: cover; }
@@ -915,6 +995,9 @@ dialog p { color: var(--muted); line-height: 1.52; }
 }
 
 @media (max-width: 350px) {
+  .case-selector { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .case-option { flex-direction: row; justify-content: start; gap: .4rem; padding-inline: .46rem; }
+  .case-option-label { text-align: start; }
   .brand { gap: .4rem; }
   .brand-mark { width: 32px; height: 32px; flex-basis: 32px; }
   .brand-name { max-width: 6rem; overflow-wrap: anywhere; }

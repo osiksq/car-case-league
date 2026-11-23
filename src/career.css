@@ -174,6 +174,7 @@
 .career-event-body { min-width: 0; overflow-wrap: anywhere; }
 .career-event-body strong { display: block; margin-bottom: .15rem; font-size: .91rem; }
 .career-event-details { display: block; color: var(--muted); font-size: .745rem; line-height: 1.35; }
+.career-event-payout { display: block; margin-top: .15rem; color: var(--career-accent); font-variant-numeric: tabular-nums; }
 
 .career-event-car {
   width: clamp(3rem, 6vw, 4.6rem);

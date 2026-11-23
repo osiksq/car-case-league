@@ -3,9 +3,10 @@ import './career.css';
 import { careerEvents, type CareerEventId } from './game/career';
 import { buildCaseReel, caseIds, casePrice, type CaseId } from './game/cases';
 import { events, tactics, type EventId, type Tactic } from './game/config';
+import { gameClockNow } from './game/economy';
 import { addDeveloperCoins, developerButton, developerDialog, developerSaveKey, openDeveloperCase } from './dev/developer';
 import {
-  createGame, finishCase, finishRace, openCase, readSave, selectCar, sellCar,
+  createGame, finishCase, finishRace, junkyardRemainingMs, openCase, readSave, selectCar, sellCar,
   startCareerRace, startRace, storageKey, toggleLock, writeSave, type GameState,
 } from './game/save';
 import { animateRace, animateRoulette } from './ui/animation';
@@ -13,7 +14,8 @@ import { careerScreen } from './ui/career';
 import { escapeHtml, icon, money } from './ui/components';
 import {
   caseAnimationScreen, caseResultScreen, casesScreen, carsById, garageScreen,
-  raceAnimationScreen, raceResultScreen, raceSetupScreen, type GarageFilters, type GarageSort,
+  raceAnimationScreen, raceResultScreen, raceSetupScreen, updateCaseCountdown, updateRaceReward,
+  type GarageFilters, type GarageSort,
 } from './ui/screens';
 
 const container = document.querySelector<HTMLElement>('#app');
@@ -32,7 +34,7 @@ const defaultFilters: GarageFilters = { sort: 'recent', rarity: '', carClass: ''
 
 let game = createGame();
 let screen: Screen = 'cases';
-let selectedCase: CaseId = 'rookie';
+let selectedCase: CaseId = 'junkyard';
 let careerEntry: CareerEventId | null = null;
 let caseReel: ReturnType<typeof buildCaseReel> | null = null;
 let eventId: EventId = 'drag';
@@ -96,9 +98,14 @@ function gameScreen() {
         ? raceSetupScreen(game, entry.eventId, tactic, entry)
         : careerScreen(game);
     }
-    case 'cases':
-      return casesScreen(game, selectedCase,
-        game.coins >= casePrice(selectedCase, game.progress.casesOpened) || hasUnlimitedCoins());
+    case 'cases': {
+      const unlimited = hasUnlimitedCoins();
+      const now = gameClockNow();
+      const canOpen = unlimited || (selectedCase === 'junkyard'
+        ? junkyardRemainingMs(game, now) === 0
+        : game.coins >= casePrice(selectedCase));
+      return casesScreen(game, selectedCase, canOpen, now, unlimited);
+    }
   }
 }
 
@@ -131,7 +138,7 @@ function toggleSandbox() {
   sandbox = !sandbox;
   game = readSave(localStorage, activeSaveKey());
   screen = 'cases';
-  selectedCase = game.pendingCaseType ?? 'rookie';
+  selectedCase = game.pendingCaseType ?? 'junkyard';
   careerEntry = null;
   caseReel = null;
   notice = '';
@@ -258,14 +265,16 @@ function dismissResult(next: Screen, action: 'keep' | 'sell' = 'keep') {
 function beginCase() {
   const opened = game.progress.casesOpened;
   const caseId = selectedCase;
+  let starterDraw = false;
   void transact((latest) => {
     if (opened !== latest.progress.casesOpened) throw new Error('Progress changed in another tab. Review the current case.');
+    starterDraw = caseId === 'junkyard' && latest.garage.length === 0;
     return hasUnlimitedCoins() ? openDeveloperCase(latest, caseId) : openCase(latest, caseId);
   }, () => {
     const owned = game.garage.find((entry) => entry.id === game.pendingCase);
     const reward = owned && carsById.get(owned.carId);
     if (reward && !reducedMotion()) {
-      caseReel = buildCaseReel(caseId, reward);
+      caseReel = buildCaseReel(caseId, reward, undefined, starterDraw);
       animation = 'case';
     }
   });
@@ -287,7 +296,7 @@ function resetProgress(message: string) {
   if (!window.confirm(message)) return;
   void transact(createGame, () => {
     screen = 'cases';
-    selectedCase = 'rookie';
+    selectedCase = 'junkyard';
     careerEntry = null;
     eventId = 'drag';
     tactic = 'Balanced';
@@ -466,3 +475,10 @@ mediaMotion.addEventListener('change', () => {
 });
 
 render();
+
+window.setInterval(() => {
+  if (document.hidden || animation || commandPending) return;
+  const now = gameClockNow();
+  updateCaseCountdown(app, hasUnlimitedCoins() ? 0 : junkyardRemainingMs(game, now));
+  updateRaceReward(app, game, screen === 'career' ? careerEntry ?? undefined : undefined, now);
+}, 250);

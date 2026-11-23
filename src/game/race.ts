@@ -1,4 +1,4 @@
-import { cars, economy, events, stats, tacticModifiers, tacticVolatility, type Car, type CarStats, type EventId, type Stat, type Tactic } from './config';
+import { cars, events, stats, tacticModifiers, tacticVolatility, type Car, type CarStats, type EventId, type Stat, type Tactic } from './config';
 import type { CareerEventId, LeagueId } from './career';
 import { createRandom } from './random';
 
@@ -15,6 +15,7 @@ export interface RaceResult {
   opponentCarId: string;
   won: boolean;
   reward: number;
+  rewardReason?: 'first-clear' | 'win' | 'cooldown' | 'loss';
   playerScore: number;
   opponentScore: number;
   explanation: string;
@@ -87,7 +88,7 @@ function buildPhases(player: Car, opponent: Car, playerScore: number, opponentSc
 
 export function simulateRace(
   id: string, eventId: EventId, tactic: Tactic, player: Car, seed?: number, careerRival?: CareerRival,
-): RaceResult {
+): Omit<RaceResult, 'reward' | 'rewardReason'> {
   const random = createRandom(seed);
   const { weights } = events[eventId];
   const opponent = careerRival?.opponent ?? pickOpponent(player, weights, random);
@@ -104,7 +105,6 @@ export function simulateRace(
     playerCarId: player.id,
     opponentCarId: opponent.id,
     won,
-    reward: won ? economy.winReward : economy.lossReward,
     playerScore,
     opponentScore,
     explanation: careerRival

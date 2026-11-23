@@ -1,7 +1,7 @@
 import { careerEvents, leagueIds, leagues, type LeagueId } from '../game/career';
 import { cars, events } from '../game/config';
-import type { GameState } from '../game/save';
-import { carImage, escapeHtml, icon } from './components';
+import { raceRewardPreview, type GameState } from '../game/save';
+import { carImage, escapeHtml, icon, money } from './components';
 
 export function careerScreen(game: GameState): string {
   const completed = new Set(game.career.completed);
@@ -55,6 +55,7 @@ export function careerScreen(game: GameState): string {
               const competition = careerEvents[eventId];
               const rivalCar = cars.find((car) => car.id === competition.rivalCarId);
               const won = completed.has(eventId);
+              const { firstWin } = raceRewardPreview(game, eventId);
               return `<li><button type="button" class="career-event" aria-label="${escapeHtml(competition.name)}"
                 aria-describedby="career-event-details-${eventId} career-event-status-${eventId}" data-action="career-event" data-id="${eventId}"${unlocked ? '' : ' disabled'}>
                 <span class="career-event-icon" aria-hidden="true">${icon(competition.eventId === 'drag' ? 'bolt' : 'races')}</span>
@@ -62,6 +63,7 @@ export function careerScreen(game: GameState): string {
                   <strong>${escapeHtml(competition.name)}</strong>
                   <span id="career-event-details-${eventId}" class="career-event-details">
                     ${escapeHtml(events[competition.eventId].name)} · ${escapeHtml(competition.rivalName)} · ${escapeHtml(competition.difficulty)}
+                    ${firstWin ? `<span class="career-event-payout">First win +${money(firstWin)} coins</span>` : ''}
                   </span>
                 </span>
                 ${rivalCar ? `<span class="career-event-car">${carImage(rivalCar)}</span>` : ''}
