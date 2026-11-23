@@ -15,6 +15,8 @@ Open [localhost:5173/car-case-league/](http://localhost:5173/car-case-league/). 
 
 The development server shows **DEV** next to Settings. It can temporarily waive case costs without debiting the wallet, add test coins, or reset development progress. The switch starts off on each page load. Development uses a separate save, and the built game served by `npm run preview` uses the release save.
 
+The public demo temporarily offers **Sandbox** (∞) next to Settings. Enabling it opens an independent garage with unlimited coins for case purchases. Exiting Sandbox or reloading returns to the regular save.
+
 ## Build and test
 
 ```sh

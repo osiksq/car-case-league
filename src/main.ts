@@ -26,7 +26,6 @@ type Visual = 'case' | 'race' | null;
 type Command = (latest: GameState) => GameState;
 type RestoreFocus = { action: string; id?: string } | { filter: string };
 
-const activeSaveKey = import.meta.env.DEV ? developerSaveKey : storageKey;
 const motionKey = import.meta.env.DEV ? 'car-case-league.reduce-motion.dev' : 'car-case-league.reduce-motion';
 const mediaMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const defaultFilters: GarageFilters = { sort: 'recent', rarity: '', carClass: '' };
@@ -45,10 +44,20 @@ let notice = '';
 let commandPending = false;
 let motionPreference = false;
 let infiniteMoney = false;
+let sandbox = false;
 let renderedView = '';
 
+function activeSaveKey() {
+  if (import.meta.env.DEV) return developerSaveKey;
+  return import.meta.env.PROD && sandbox ? `${storageKey}.sandbox` : storageKey;
+}
+
+function hasUnlimitedCoins() {
+  return (import.meta.env.DEV && infiniteMoney) || (import.meta.env.PROD && sandbox);
+}
+
 try {
-  game = readSave(localStorage, activeSaveKey);
+  game = readSave(localStorage, activeSaveKey());
   selectedCase = game.pendingCaseType ?? selectedCase;
   motionPreference = localStorage.getItem(motionKey) === 'true';
 } catch {
@@ -89,7 +98,7 @@ function gameScreen() {
     }
     case 'cases':
       return casesScreen(game, selectedCase,
-        game.coins >= casePrice(selectedCase, game.progress.casesOpened) || (import.meta.env.DEV && infiniteMoney));
+        game.coins >= casePrice(selectedCase, game.progress.casesOpened) || hasUnlimitedCoins());
   }
 }
 
@@ -104,6 +113,29 @@ function dialogMarkup() {
       <button type="button" class="button button-secondary" data-action="reset">Reset Progress</button>
     </div>
   </dialog>`;
+}
+
+function sandboxDialog() {
+  return `<dialog id="sandbox-dialog" class="settings-dialog panel" aria-labelledby="sandbox-title">
+    <div class="panel-heading"><h2 id="sandbox-title">Sandbox</h2></div>
+    <p>Open any case with unlimited coins. Sandbox uses its own garage and progress.</p>
+    <div class="button-row">
+      <button type="button" class="button button-primary" role="switch" aria-label="Unlimited coins"
+        aria-checked="${sandbox}" data-action="sandbox-toggle">${sandbox ? 'Exit Sandbox' : 'Enable unlimited coins'}</button>
+      <button type="button" class="button button-secondary" data-action="sandbox-close">Close</button>
+    </div>
+  </dialog>`;
+}
+
+function toggleSandbox() {
+  sandbox = !sandbox;
+  game = readSave(localStorage, activeSaveKey());
+  screen = 'cases';
+  selectedCase = game.pendingCaseType ?? 'rookie';
+  careerEntry = null;
+  caseReel = null;
+  notice = '';
+  render({ action: 'sandbox-open' });
 }
 
 function render(focus?: 'heading' | RestoreFocus) {
@@ -134,10 +166,12 @@ function render(focus?: 'heading' | RestoreFocus) {
       <div class="header-actions">
         <div class="wallet" aria-label="Wallet">
           <span class="wallet-icon">${icon('coin')}</span>
-          <span class="wallet-label">Coins</span><strong class="wallet-value" data-testid="coin-balance">${import.meta.env.DEV && infiniteMoney ? '∞' : money(visibleWallet)}</strong>
+          <span class="wallet-label">Coins</span><strong class="wallet-value" data-testid="coin-balance">${hasUnlimitedCoins() ? '∞' : money(visibleWallet)}</strong>
         </div>
         <button class="settings-button" type="button" data-action="settings" aria-label="Settings"${animation ? ' disabled' : ''}>${icon('settings')}</button>
         ${import.meta.env.DEV ? developerButton(Boolean(animation)) : ''}
+        ${import.meta.env.PROD ? `<button class="settings-button" type="button" data-action="sandbox-open"
+          aria-label="Sandbox" aria-haspopup="dialog" title="Sandbox"${animation ? ' disabled' : ''}><span class="wallet-value">∞</span></button>` : ''}
       </div>
     </header>
     <main class="main-content" id="main-content" tabindex="-1">
@@ -146,6 +180,7 @@ function render(focus?: 'heading' | RestoreFocus) {
     </main>
     ${dialogMarkup()}
     ${import.meta.env.DEV ? developerDialog(infiniteMoney) : ''}
+    ${import.meta.env.PROD ? sandboxDialog() : ''}
   </div>`;
 
   if (focus === 'heading') {
@@ -173,18 +208,19 @@ function showResult() {
 async function transact(command: Command, onCommit: () => void, focus: 'heading' | RestoreFocus = 'heading') {
   if (commandPending) return;
   commandPending = true;
+  const key = activeSaveKey();
   let latest: GameState | undefined;
   let committed = false;
   const save = () => {
-    latest = readSave(localStorage, activeSaveKey);
+    latest = readSave(localStorage, key);
     const next = command(latest);
-    if (next !== latest) writeSave(localStorage, next, activeSaveKey);
+    if (next !== latest) writeSave(localStorage, next, key);
     game = next;
     committed = true;
   };
 
   try {
-    if (navigator.locks) await navigator.locks.request(activeSaveKey, save);
+    if (navigator.locks) await navigator.locks.request(key, save);
     else save();
     notice = '';
     onCommit();
@@ -224,7 +260,7 @@ function beginCase() {
   const caseId = selectedCase;
   void transact((latest) => {
     if (opened !== latest.progress.casesOpened) throw new Error('Progress changed in another tab. Review the current case.');
-    return import.meta.env.DEV && infiniteMoney ? openDeveloperCase(latest, caseId) : openCase(latest, caseId);
+    return hasUnlimitedCoins() ? openDeveloperCase(latest, caseId) : openCase(latest, caseId);
   }, () => {
     const owned = game.garage.find((entry) => entry.id === game.pendingCase);
     const reward = owned && carsById.get(owned.carId);
@@ -270,6 +306,14 @@ function handleAction(button: HTMLButtonElement) {
   const action = button.dataset.action ?? '';
   const id = button.dataset.id;
   if (animation && action !== 'skip') return;
+
+  if (import.meta.env.PROD) {
+    switch (action) {
+      case 'sandbox-open': app.querySelector<HTMLDialogElement>('#sandbox-dialog')?.showModal(); return;
+      case 'sandbox-close': app.querySelector<HTMLDialogElement>('#sandbox-dialog')?.close(); return;
+      case 'sandbox-toggle': toggleSandbox(); return;
+    }
+  }
 
   if (import.meta.env.DEV) {
     switch (action) {
@@ -364,7 +408,7 @@ function handleAction(button: HTMLButtonElement) {
     case 'reset':
       resetProgress(import.meta.env.DEV
         ? 'Reset Car Case League development progress on this device?'
-        : 'Reset all Car Case League progress on this device?');
+        : sandbox ? 'Reset Sandbox progress on this device?' : 'Reset all Car Case League progress on this device?');
       break;
   }
 }
@@ -402,9 +446,10 @@ app.addEventListener('change', (event) => {
 });
 
 window.addEventListener('storage', (event) => {
-  if ((event.key !== activeSaveKey && event.key !== null) || commandPending) return;
+  const key = activeSaveKey();
+  if ((event.key !== key && event.key !== null) || commandPending) return;
   try {
-    game = readSave(localStorage, activeSaveKey);
+    game = readSave(localStorage, key);
     selectedCase = game.pendingCaseType ?? selectedCase;
     animation = null;
     caseReel = null;
