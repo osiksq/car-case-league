@@ -13,7 +13,7 @@ test('production excludes developer controls and ignores development data', asyn
   await page.getByRole('button', { name: 'Open Free Case', exact: true }).click();
   await page.getByRole('button', { name: 'Skip Animation', exact: true }).click();
   await page.getByRole('button', { name: 'Keep', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Open Case', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Open Free Case', exact: true })).toBeDisabled();
   await expect(page.getByTestId('coin-balance')).toHaveText('60');
 
   const assets = new URL('../../dist/assets/', import.meta.url);
@@ -37,7 +37,7 @@ test('public sandbox opens paid cases without modifying the normal save', async 
   await page.goto('./');
   await button('Open Free Case').click();
   await button('Keep').click();
-  await expect(button('Open Case')).toBeDisabled();
+  await expect(button('Open Free Case')).toBeDisabled();
   const normalSave = await page.evaluate(() => localStorage.getItem('car-case-league.save'));
   expect(normalSave).toBeTruthy();
   await expect(wallet).toHaveText('60');
@@ -54,7 +54,7 @@ test('public sandbox opens paid cases without modifying the normal save', async 
 
   await toggleSandbox();
   await expect(wallet).toHaveText('60');
-  await expect(button('Open Case')).toBeDisabled();
+  await expect(button('Open Free Case')).toBeDisabled();
   await page.reload();
   await expect(wallet).toHaveText('60');
   expect(await page.evaluate(() => localStorage.getItem('car-case-league.save'))).toBe(normalSave);

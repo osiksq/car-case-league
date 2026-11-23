@@ -3,18 +3,23 @@ import {
   type Car, type EventId, type Tactic,
 } from '../game/config';
 import { caseIds, casePool, casePrice, cases, type CaseId } from '../game/cases';
-import { careerEvents, leagues, type CareerEvent } from '../game/career';
-import type { GameState } from '../game/save';
+import { careerEvents, leagues, type CareerEvent, type CareerEventId } from '../game/career';
+import { economy, gameClockNow } from '../game/economy';
+import { junkyardRemainingMs, raceRewardPreview, type GameState } from '../game/save';
 import { careerAward } from './career';
 import { carCard, carImage, carStyle, carStats, escapeHtml, icon, money, oddsTable, pageHeading, rarityBadge, statEntries } from './components';
 
 export const carsById = new Map(cars.map((car) => [car.id, car]));
 
 const caseArtwork = {
+  junkyard: { badge: 'garage', featuredCarId: 'bravik-110' },
   rookie: { badge: 'logo', featuredCarId: 'merovar-sprint' },
   street: { badge: 'bolt', featuredCarId: 'thalven-gt' },
+  sport: { badge: 'career', featuredCarId: 'vossari-spyder' },
   performance: { badge: 'races', featuredCarId: 'kairox-r' },
+  heritage: { badge: 'crest', featuredCarId: 'ardenza-proto' },
   elite: { badge: 'crest', featuredCarId: 'orvane-eclipse' },
+  hyper: { badge: 'bolt', featuredCarId: 'novaryn-zero' },
 } as const satisfies Record<CaseId, { badge: Parameters<typeof icon>[0]; featuredCarId: string }>;
 
 export type GarageSort = 'recent' | 'rarity' | 'name' | 'speed';
@@ -42,11 +47,33 @@ function option(value: string, label: string, current: string) {
   return `<option value="${escapeHtml(value)}"${value === current ? ' selected' : ''}>${escapeHtml(label)}</option>`;
 }
 
-export function casesScreen(game: GameState, activeCase: CaseId, canOpen: boolean) {
+function cooldownTime(ms: number): string {
+  const seconds = Math.ceil(ms / 1000);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function junkyardStatus(ms: number): string {
+  return ms > 0 ? `Next free case in ${cooldownTime(ms)}` : 'Free case ready';
+}
+
+export function updateCaseCountdown(root: ParentNode, remainingMs: number): void {
+  const status = root.querySelector<HTMLElement>('[data-junkyard-status]');
+  const shortStatus = remainingMs > 0 ? cooldownTime(remainingMs) : 'Free';
+  if (status && status.textContent !== shortStatus) status.textContent = shortStatus;
+  const countdown = root.querySelector<HTMLElement>('[data-testid="junkyard-countdown"]');
+  const button = root.querySelector<HTMLButtonElement>('[data-junkyard-open]');
+  const label = junkyardStatus(remainingMs);
+  if (countdown && countdown.textContent !== label) countdown.textContent = label;
+  if (button && button.disabled !== (remainingMs > 0)) button.disabled = remainingMs > 0;
+}
+
+export function casesScreen(game: GameState, activeCase: CaseId, canOpen: boolean, now = gameClockNow(), unlimited = false) {
   const selected = cases[activeCase];
-  const price = casePrice(activeCase, game.progress.casesOpened);
-  const free = price === 0;
-  const pool = casePool(activeCase);
+  const price = casePrice(activeCase);
+  const free = activeCase === 'junkyard';
+  const remainingMs = unlimited ? 0 : junkyardRemainingMs(game, now);
+  const starterOpening = free && game.garage.length === 0;
+  const pool = casePool(activeCase, starterOpening);
   const artwork = caseArtwork[activeCase];
   const featuredCar = pool.find(({ id }) => id === artwork.featuredCarId) ?? pool[0];
   return `<section class="case-screen" data-case-theme="${activeCase}" aria-labelledby="screen-title">
@@ -60,9 +87,12 @@ export function casesScreen(game: GameState, activeCase: CaseId, canOpen: boolea
     </header>
     <div class="case-selector" role="group" aria-label="Select a case">
       ${caseIds.map((id) => `<button class="case-option" type="button" data-action="select-case" data-id="${id}"
-        data-case-theme="${id}" aria-pressed="${id === activeCase}">
+        data-case-theme="${id}" aria-label="${cases[id].name}" aria-describedby="case-option-price-${id}" aria-pressed="${id === activeCase}">
         <span class="case-option-icon">${icon(caseArtwork[id].badge)}</span>
-        <span>${cases[id].name}</span>
+        <span class="case-option-label"><strong>${cases[id].name.replace(/ Case$/, '')}</strong>
+          <small id="case-option-price-${id}"${id === 'junkyard' ? ' data-junkyard-status' : ''}>${id === 'junkyard'
+            ? remainingMs > 0 ? cooldownTime(remainingMs) : 'Free'
+            : `${money(casePrice(id))} coins`}</small></span>
       </button>`).join('')}
     </div>
     <div class="case-grid">
@@ -77,23 +107,27 @@ export function casesScreen(game: GameState, activeCase: CaseId, canOpen: boolea
         </div>
         <div class="case-content">
           <h2 id="selected-case-title">${selected.name}</h2>
-          <button type="button" class="button button-primary case-open-button" data-action="open-case"${free ? '' : ' aria-describedby="selected-case-price"'}${canOpen ? '' : ' disabled'}>
+          <button type="button" class="button button-primary case-open-button" data-action="open-case"
+            ${free ? 'data-junkyard-open aria-describedby="junkyard-countdown"' : 'aria-describedby="selected-case-price"'}${(free ? remainingMs === 0 : canOpen) ? '' : ' disabled'}>
             ${icon('cases')} ${free ? 'Open Free Case' : 'Open Case'}
           </button>
-          ${free ? '' : `<span class="case-price" id="selected-case-price">${icon('coin')} ${money(price)} coins</span>`}
-          ${canOpen ? '' : '<p class="action-hint">Race to earn more coins.</p>'}
+          ${free
+            ? `<div class="junkyard-status"><span role="timer" id="junkyard-countdown" data-testid="junkyard-countdown">${junkyardStatus(remainingMs)}</span>
+                <span>${unlimited ? 'Unlimited openings are active.' : `One free opening every ${economy.junkyardCooldownMs / 1000}s.`}</span></div>`
+            : `<span class="case-price" id="selected-case-price">${icon('coin')} ${unlimited ? 'Free with unlimited coins' : `${money(price)} coins`}</span>`}
+          ${free || canOpen ? '' : '<p class="action-hint">Win Career competitions or sell spare cars to earn coins.</p>'}
         </div>
       </article>
       <aside class="case-sidebar">
         <section class="odds-panel panel" aria-labelledby="odds-title">
           <div class="panel-heading"><h2 id="odds-title">Drop odds</h2><span>Per case</span></div>
           ${oddsTable(selected.odds)}
-          <p class="odds-note">Cars have equal odds within each rarity.</p>
+          <p class="odds-note">${starterOpening ? 'Your first drop is drawn from a pool of Rookie-ready cars. ' : activeCase === 'heritage' ? 'Collector cars only. ' : ''}Cars have equal odds within each rarity.</p>
         </section>
         <section class="case-preview panel" aria-labelledby="case-preview-title">
           <div class="case-preview-art">${carImage(featuredCar)}</div>
           <div class="case-preview-details">
-            <p id="case-preview-title">Featured drop</p>
+            <p id="case-preview-title">${starterOpening ? 'Possible starter' : 'Featured drop'}</p>
             <h2>${escapeHtml(featuredCar.name)}</h2>
             ${rarityBadge(featuredCar.rarity)}
           </div>
@@ -102,9 +136,9 @@ export function casesScreen(game: GameState, activeCase: CaseId, canOpen: boolea
     </div>
     <details class="catalog-section panel">
       <summary class="catalog-summary">
-        ${icon('garage')} <strong>Vehicle Pool</strong><span>${pool.length} vehicles</span>
+        ${icon('garage')} <strong>Vehicle Pool</strong><span>${pool.length} ${starterOpening ? 'starter cars' : 'vehicles'}</span>
       </summary>
-      <div class="card-grid">${pool.map((car) => carCard(car)).join('')}</div>
+      <div class="card-grid">${pool.map((car) => carCard(car, { stats: true })).join('')}</div>
     </details>
   </section>`;
 }
@@ -133,7 +167,7 @@ export function garageScreen(game: GameState, filters: GarageFilters) {
 
   const empty = `<div class="empty-state panel">
     <h2>${game.garage.length ? 'No cars match these filters' : 'Your garage is empty'}</h2>
-    <p>${game.garage.length ? 'Change the rarity or class to see more of your collection.' : 'Open the Rookie Case to add your first car.'}</p>
+    <p>${game.garage.length ? 'Change the rarity or class to see more of your collection.' : 'Open the free Junkyard Case to add your first car.'}</p>
     ${game.garage.length ? '<button class="button button-secondary" type="button" data-action="clear-filters">Clear Filters</button>' :
       '<button class="button button-primary" type="button" data-action="nav-cases">Go to Cases</button>'}
   </div>`;
@@ -159,12 +193,24 @@ export function garageScreen(game: GameState, filters: GarageFilters) {
   </section>`;
 }
 
-export function raceSetupScreen(game: GameState, eventId: EventId, tactic: Tactic, competition?: CareerEvent) {
+function replayRewardStatus(remainingMs: number): string {
+  return remainingMs > 0 ? `Shared reward cooldown: ${cooldownTime(remainingMs)}` : 'Shared reward ready';
+}
+
+export function updateRaceReward(root: ParentNode, game: GameState, careerEventId?: CareerEventId, now = gameClockNow()): void {
+  const status = root.querySelector<HTMLElement>('[data-race-reward-status]');
+  if (!status) return;
+  const label = replayRewardStatus(raceRewardPreview(game, careerEventId, now).remainingMs);
+  if (status.textContent !== label) status.textContent = label;
+}
+
+export function raceSetupScreen(game: GameState, eventId: EventId, tactic: Tactic, competition?: CareerEvent, now = gameClockNow()) {
   const selected = game.garage.find((car) => car.id === game.selectedId);
   const car = selected && carsById.get(selected.carId);
   const races = game.races.filter((race) => race.careerEventId === competition?.id).slice(-3).reverse();
   const rival = competition && carsById.get(competition.rivalCarId);
   const event = events[eventId];
+  const reward = raceRewardPreview(game, competition?.id, now);
 
   return `<section class="race-screen" aria-labelledby="screen-title">
     ${competition
@@ -194,6 +240,14 @@ export function raceSetupScreen(game: GameState, eventId: EventId, tactic: Tacti
       </section>
       <section class="race-entry panel" aria-labelledby="entry-title">
         <div class="panel-heading"><h2 id="entry-title">Race entry</h2></div>
+        <div class="race-payout">
+          <dl>
+            ${reward.firstWin ? `<div><dt>First win</dt><dd>+${money(reward.firstWin)} coins</dd></div>` : ''}
+            <div><dt>${competition ? 'Replay win' : 'Win'}</dt><dd>+${money(reward.replayWin)} coins</dd></div>
+          </dl>
+          <p role="timer" data-race-reward-status>${replayRewardStatus(reward.remainingMs)}</p>
+          <p>Free-race and replay wins share a ${economy.raceRewardCooldownMs / 1000}s reward cooldown. ${reward.firstWin ? 'First career wins pay immediately. ' : ''}Losses earn no coins.</p>
+        </div>
         ${car && selected ? `<label class="car-selector">Race car <select data-filter="raceCar">${game.garage.map((entry, index) => {
           const model = carsById.get(entry.carId);
           return model ? option(entry.id, `${model.name} · #${index + 1}`, selected.id) : '';
@@ -272,10 +326,12 @@ export function raceResultScreen(race: Race, player: Car, opponent: Car) {
     <section class="race-result panel">
       <div class="result-summary">
         <div><p class="eyebrow">${race.won ? 'WIN' : 'LOSS'}</p><h2>${race.won ? 'Victory' : 'Defeat'}</h2></div>
-        <span class="reward-badge">${icon('coin')} +${money(race.reward)} coins</span>
+        <span class="reward-badge${race.reward ? '' : ' reward-badge-empty'}">${icon('coin')} +${money(race.reward)} coins</span>
       </div>
       ${race.careerAward ? careerAward(race.careerAward) : ''}
       <p class="result-explanation">${escapeHtml(race.explanation)}</p>
+      ${race.rewardReason === 'cooldown' ? '<p class="race-result-reward-note">The shared reward cooldown was active when this race started.</p>' : ''}
+      ${race.rewardReason === 'loss' ? '<p class="race-result-reward-note">Losses do not pay coins. You can try this race again.</p>' : ''}
       <div class="result-scores">
         <article>${carCard(player)}<p>Your score <strong>${race.playerScore.toFixed(2)}</strong></p></article>
         <article>${carCard(opponent)}<p>${competition ? escapeHtml(competition.rivalName) + ' score' : 'Rival score'} <strong>${race.opponentScore.toFixed(2)}</strong></p></article>

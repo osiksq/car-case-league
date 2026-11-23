@@ -1,14 +1,12 @@
-import { casePrice, type CaseId } from '../game/cases';
+import type { CaseId } from '../game/cases';
 import { openCase, storageKey, type GameState } from '../game/save';
 
 if (import.meta.env.DEV) void import('./developer.css');
 
 export const developerSaveKey = `${storageKey}.dev`;
 
-export function openDeveloperCase(state: GameState, id: CaseId): GameState {
-  const coins = Math.max(state.coins, casePrice(id, state.progress.casesOpened));
-  const purchase = openCase({ ...state, coins }, id);
-  return { ...purchase, coins: state.coins };
+export function openDeveloperCase(state: GameState, id: CaseId, seed?: number, now?: number): GameState {
+  return openCase(state, id, seed, now, true);
 }
 
 export function addDeveloperCoins(state: GameState): GameState {
