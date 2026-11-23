@@ -10,6 +10,7 @@ import {
   startCareerRace, startRace, storageKey, toggleLock, writeSave, type GameState,
 } from './game/save';
 import { animateRace, animateRoulette } from './ui/animation';
+import { createRaceAudio, unlockRaceAudio } from './ui/race-audio';
 import { careerScreen } from './ui/career';
 import { escapeHtml, icon, money } from './ui/components';
 import {
@@ -29,6 +30,7 @@ type Command = (latest: GameState) => GameState;
 type RestoreFocus = { action: string; id?: string } | { filter: string };
 
 const motionKey = import.meta.env.DEV ? 'car-case-league.reduce-motion.dev' : 'car-case-league.reduce-motion';
+const raceSoundKey = import.meta.env.DEV ? 'car-case-league.race-sound.dev' : 'car-case-league.race-sound';
 const mediaMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const defaultFilters: GarageFilters = { sort: 'recent', rarity: '', carClass: '' };
 
@@ -38,6 +40,7 @@ let selectedCase: CaseId | null = null;
 let careerEntry: CareerEventId | null = null;
 let caseReel: ReturnType<typeof buildCaseReel> | null = null;
 let eventId: EventId = 'drag';
+let freeRaceSeed = nextRaceSeed();
 let tactic: Tactic = 'Balanced';
 let filters = { ...defaultFilters };
 let animation: Visual = null;
@@ -45,6 +48,7 @@ let stopAnimation = () => {};
 let notice = '';
 let commandPending = false;
 let motionPreference = false;
+let raceSound = true;
 let infiniteMoney = false;
 let sandbox = false;
 let renderedView = '';
@@ -58,10 +62,15 @@ function hasUnlimitedCoins() {
   return (import.meta.env.DEV && infiniteMoney) || (import.meta.env.PROD && sandbox);
 }
 
+function nextRaceSeed(): number {
+  return crypto.getRandomValues(new Uint32Array(1))[0];
+}
+
 try {
   game = readSave(localStorage, activeSaveKey());
   selectedCase = game.pendingCaseType ?? selectedCase;
   motionPreference = localStorage.getItem(motionKey) === 'true';
+  raceSound = localStorage.getItem(raceSoundKey) !== 'false';
 } catch {
   notice = 'Local storage is unavailable. Enable storage to play and save your progress.';
 }
@@ -86,12 +95,12 @@ function gameScreen() {
     const player = carsById.get(race.playerCarId);
     const opponent = carsById.get(race.opponentCarId);
     if (player && opponent) {
-      return animation === 'race' ? raceAnimationScreen(race, player, opponent) : raceResultScreen(race, player, opponent);
+      return animation === 'race' ? raceAnimationScreen(race, player, opponent) : raceResultScreen(race, player, opponent, game.career);
     }
   }
   switch (screen) {
     case 'garage': return garageScreen(game, filters);
-    case 'races': return raceSetupScreen(game, eventId, tactic);
+    case 'races': return raceSetupScreen(game, eventId, tactic, undefined, gameClockNow(), freeRaceSeed);
     case 'career': {
       const entry = careerEntry ? careerEvents[careerEntry] : undefined;
       return entry && game.career.unlocked.includes(entry.leagueId)
@@ -115,6 +124,7 @@ function dialogMarkup() {
     <div class="panel-heading"><h2 id="settings-title">Settings</h2></div>
     <label class="motion-setting"><input type="checkbox" data-filter="motion"${reducedMotion() ? ' checked' : ''}${mediaMotion.matches ? ' disabled' : ''}> Reduce Motion</label>
     ${mediaMotion.matches ? '<p class="action-hint">Your device has requested reduced motion.</p>' : ''}
+    <label class="motion-setting"><input type="checkbox" data-filter="race-sound"${raceSound ? ' checked' : ''}> Race Sound</label>
     <p>Reset clears your cars, coins, race history and career on this device.</p>
     <div class="button-row">
       <button type="button" class="button button-secondary" data-action="close-settings">Close</button>
@@ -204,7 +214,14 @@ function render(focus?: 'heading' | RestoreFocus) {
   }
 
   if (animation === 'case') stopAnimation = animateRoulette(app, showResult);
-  if (animation === 'race' && game.pendingRace) stopAnimation = animateRace(app, game.pendingRace, showResult);
+  if (animation === 'race' && game.pendingRace) {
+    const audio = raceSound ? createRaceAudio() : undefined;
+    const stopRace = animateRace(app, game.pendingRace, showResult, audio?.cue);
+    stopAnimation = () => {
+      stopRace();
+      audio?.stop();
+    };
+  }
 }
 
 function showResult() {
@@ -286,12 +303,17 @@ function beginRace() {
   const selectedId = game.selectedId;
   const completed = game.progress.racesCompleted;
   const competition = screen === 'career' ? careerEntry : null;
+  const seed = freeRaceSeed;
+  if (!reducedMotion() && raceSound) unlockRaceAudio();
   void transact((latest) => {
     if (selectedId !== latest.selectedId || completed !== latest.progress.racesCompleted) {
       throw new Error('Progress changed in another tab. Review your race entry.');
     }
-    return competition ? startCareerRace(latest, competition, tactic) : startRace(latest, eventId, tactic);
-  }, () => { animation = reducedMotion() ? null : 'race'; });
+    return competition ? startCareerRace(latest, competition, tactic) : startRace(latest, eventId, tactic, seed);
+  }, () => {
+    if (!competition) freeRaceSeed = nextRaceSeed();
+    animation = reducedMotion() ? null : 'race';
+  });
 }
 
 function resetProgress(message: string) {
@@ -445,6 +467,15 @@ app.addEventListener('click', (event) => {
 
 app.addEventListener('change', (event) => {
   const field = event.target;
+  if (field instanceof HTMLInputElement && field.dataset.filter === 'race-sound') {
+    raceSound = field.checked;
+    try {
+      localStorage.setItem(raceSoundKey, String(raceSound));
+    } catch {
+      notice = 'Race sound preference will reset after reload.';
+    }
+    return;
+  }
   if (field instanceof HTMLInputElement && field.dataset.filter === 'motion') {
     try {
       localStorage.setItem(motionKey, String(field.checked));

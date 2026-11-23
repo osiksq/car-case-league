@@ -1,7 +1,6 @@
-import type { GameState } from '../game/save';
+import type { RaceResult } from '../game/race';
+import { playRaceScene, type RaceCue } from './race-scene';
 
-type Race = NonNullable<GameState['pendingRace']>;
-const raceDuration = 13_000;
 const reelDuration = 3_800;
 const reelHold = 330;
 
@@ -48,33 +47,6 @@ export function animateRoulette(root: HTMLElement, done: () => void) {
   };
 }
 
-export function animateRace(root: HTMLElement, race: Race, done: () => void) {
-  const { phases } = race;
-  const lanes = (['player', 'opponent'] as const).map((side) => {
-    return {
-      side,
-      bar: root.querySelector<HTMLElement>(`[data-progress="${side}"]`),
-      fill: root.querySelector<HTMLElement>(`[data-progress="${side}"] .progress-fill`),
-      label: root.querySelector<HTMLElement>(`[data-percent="${side}"]`),
-      previousValue: -1,
-    };
-  });
-
-  return animate(raceDuration, (elapsed) => {
-    const phase = elapsed / raceDuration * (phases.length - 1);
-    const index = Math.floor(phase);
-    const from = phases[index];
-    const to = phases[index + 1] ?? from;
-    const fraction = phase - index;
-    for (const lane of lanes) {
-      const value = from[lane.side] + (to[lane.side] - from[lane.side]) * fraction;
-      if (lane.fill) lane.fill.style.width = `${value}%`;
-      const display = Math.floor(value);
-      if (display !== lane.previousValue) {
-        lane.bar?.setAttribute('aria-valuenow', String(display));
-        if (lane.label) lane.label.textContent = `${display}%`;
-        lane.previousValue = display;
-      }
-    }
-  }, done);
+export function animateRace(root: HTMLElement, race: RaceResult, done: () => void, onCue?: (cue: RaceCue) => void) {
+  return playRaceScene(root, race, done, onCue);
 }

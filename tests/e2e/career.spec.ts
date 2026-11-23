@@ -21,7 +21,7 @@ async function winNextRace(page: Page, reloadDuringRace = false) {
   });
   await page.getByRole('button', { name: 'Start Race', exact: true }).click();
   if (reloadDuringRace) {
-    await expect(page.getByRole('progressbar', { name: 'Your car race progress' })).toBeVisible();
+    await expect(page.locator('[data-race-scene]')).toBeVisible();
     await page.reload();
   }
   await expect(page.getByRole('heading', { name: 'Victory', exact: true })).toBeVisible();

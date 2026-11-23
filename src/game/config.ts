@@ -10,7 +10,7 @@ export type CarStats = Record<Stat, number>;
 
 export const tactics = ['Safe', 'Balanced', 'Push'] as const;
 export type Tactic = (typeof tactics)[number];
-export type EventId = 'drag' | 'circuit';
+export type EventId = 'drag' | 'circuit' | 'wet-circuit' | 'endurance';
 
 export interface Car {
   id: string;
@@ -22,7 +22,7 @@ export interface Car {
   artIndex: number;
 }
 
-export const events: Record<EventId, { name: string; description: string; weights: CarStats }> = {
+export const events: Record<EventId, { name: string; description: string; weights: CarStats; rivalVolatility?: number }> = {
   drag: {
     name: 'Drag Race',
     description: 'A straight-line sprint that rewards quick launches and strong acceleration.',
@@ -32,6 +32,18 @@ export const events: Record<EventId, { name: string; description: string; weight
     name: 'Circuit Race',
     description: 'A technical lap that favors confident cornering and sustained speed.',
     weights: { speed: 35, acceleration: 15, handling: 40, reliability: 10 },
+  },
+  'wet-circuit': {
+    name: 'Wet Circuit',
+    description: 'Standing water and slick corners reward confident handling and a dependable car.',
+    weights: { speed: 15, acceleration: 10, handling: 50, reliability: 25 },
+    rivalVolatility: 0.07,
+  },
+  endurance: {
+    name: 'Endurance',
+    description: 'A long twilight run that rewards reliable pace through every stint.',
+    weights: { speed: 20, acceleration: 10, handling: 20, reliability: 50 },
+    rivalVolatility: 0.085,
   },
 };
 

@@ -38,7 +38,7 @@ test('first visit through a paid case survives reload', async ({ page }) => {
     await page.getByRole('button', { name: competition, exact: true }).click();
     for (let attempt = 0; attempt < 12; attempt++) {
       await page.getByRole('button', { name: 'Start Race', exact: true }).click();
-      await page.getByRole('button', { name: 'Skip Animation', exact: true }).click();
+      await page.getByRole('button', { name: 'Skip Race', exact: true }).click();
       const outcome = await page.getByRole('heading', { name: /^(Victory|Defeat)$/ }).textContent();
       if (outcome === 'Victory') break;
       await page.getByRole('button', { name: 'Race Again', exact: true }).click();
@@ -89,7 +89,7 @@ test('refreshing a free reveal or race animation preserves its single award', as
   await expect(page.getByTestId('garage-car')).toHaveCount(1);
 
   await startRace(page, 'Circuit Race');
-  await expect(page.getByRole('button', { name: 'Skip Animation', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Skip Race', exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Race Results' })).toBeVisible();
   const afterRace = await page.getByTestId('coin-balance').innerText();
@@ -152,8 +152,9 @@ test('the reel and race progress finish automatically', async ({ page }) => {
   await page.getByRole('button', { name: 'Go to Garage', exact: true }).click();
 
   await startRace(page, 'Drag Race');
-  const lane = page.getByRole('progressbar', { name: 'Your car race progress' });
-  await expect(lane).toBeVisible();
-  await expect(lane).toHaveAttribute('aria-valuenow', /^[1-9]\d*$/);
-  await expect(page.getByRole('heading', { name: 'Race Results' })).toBeVisible({ timeout: 18_000 });
+  const scene = page.locator('[data-race-scene]');
+  await expect(scene).toBeVisible();
+  await expect(scene).toHaveAttribute('data-race-status', 'racing', { timeout: 6_000 });
+  await expect(scene).toHaveAttribute('data-player-progress', /[1-9]/);
+  await expect(page.getByRole('heading', { name: 'Race Results' })).toBeVisible({ timeout: 24_000 });
 });
