@@ -4,6 +4,7 @@ import { storageKey } from '../../src/game/save';
 
 async function openStarter(page: Page) {
   await page.goto('./');
+  await page.getByRole('button', { name: 'Junkyard Case', exact: true }).click();
   await page.getByRole('button', { name: 'Open Free Case', exact: true }).click();
   await page.getByRole('button', { name: 'Skip Animation', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Case Result' })).toBeVisible();
@@ -79,6 +80,7 @@ test('first visit through a paid case survives reload', async ({ page }) => {
 
 test('refreshing a free reveal or race animation preserves its single award', async ({ page }) => {
   await page.goto('./');
+  await page.getByRole('button', { name: 'Junkyard Case', exact: true }).click();
   await page.getByRole('button', { name: 'Open Free Case', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Skip Animation', exact: true })).toBeVisible();
   await page.reload();
@@ -99,6 +101,9 @@ test('refreshing a free reveal or race animation preserves its single award', as
 
 test('layout fits the viewport including on mobile', async ({ page }) => {
   await page.goto('./');
+  await expect(page.locator('.case-collection .case-crate')).toHaveCount(8);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await page.getByRole('button', { name: 'Junkyard Case', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Open Free Case', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Cases', exact: true })).toHaveAttribute('aria-current', 'page');
   const pool = page.locator('details').filter({ has: page.getByText('Vehicle Pool', { exact: true }) });
@@ -118,12 +123,15 @@ test('Junkyard cooldown is saved and the next car can be sold', async ({ page })
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const button = (name: string) => page.getByRole('button', { name, exact: true });
   await page.goto('./');
+  await button('Junkyard Case').click();
   await button('Open Free Case').click();
   await button('Keep').click();
   await expect(button('Open Free Case')).toBeDisabled();
   const opened = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).progress.casesOpened, storageKey);
   expect(opened).toBe(1);
   await page.reload();
+  await expect(button('Junkyard Case')).toContainText(/in \d:\d{2}/);
+  await button('Junkyard Case').click();
   await expect(button('Open Free Case')).toBeDisabled();
   await expect(page.getByTestId('junkyard-countdown')).toBeVisible();
   await page.clock.fastForward(60_000);
@@ -138,6 +146,7 @@ test('Junkyard cooldown is saved and the next car can be sold', async ({ page })
 
 test('the reel and race progress finish automatically', async ({ page }) => {
   await page.goto('./');
+  await page.getByRole('button', { name: 'Junkyard Case', exact: true }).click();
   await page.getByRole('button', { name: 'Open Free Case', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Case Result' })).toBeVisible({ timeout: 8_000 });
   await page.getByRole('button', { name: 'Go to Garage', exact: true }).click();

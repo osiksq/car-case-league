@@ -51,6 +51,7 @@ test('promotion and its award survive reload without awarding the badge twice', 
   const award = page.getByTestId('career-award');
   const wallet = page.getByTestId('coin-balance');
   await page.goto('./');
+  await button('Junkyard Case').click();
   await button('Open Free Case').click();
   await button('Go to Garage').click();
   await button('Career').click();
@@ -114,12 +115,14 @@ test('a saved Alpha 0.2 wallet, garage and promotion migrate without a second aw
   await button('Back to Career').click();
   await expect(button('Neon Straight')).toBeEnabled();
   await button('Cases').click();
+  await button('Junkyard Case').click();
   await button('Open Free Case').click();
   await button('Go to Garage').click();
   await expect(page.getByTestId('garage-car')).toHaveCount(2);
   await expect(button('Unlock Petrel S1').first()).toBeVisible();
   await page.reload();
   await expect(page.getByTestId('coin-balance')).toHaveText('721');
+  await button('Junkyard Case').click();
   await expect(button('Open Free Case')).toBeDisabled();
   const saved = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!), storageKey);
   expect(saved.version).toBe(2);

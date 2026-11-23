@@ -13,7 +13,7 @@ import { animateRace, animateRoulette } from './ui/animation';
 import { careerScreen } from './ui/career';
 import { escapeHtml, icon, money } from './ui/components';
 import {
-  caseAnimationScreen, caseResultScreen, casesScreen, carsById, garageScreen,
+  caseAnimationScreen, caseCollectionScreen, caseResultScreen, casesScreen, carsById, garageScreen,
   raceAnimationScreen, raceResultScreen, raceSetupScreen, updateCaseCountdown, updateRaceReward,
   type GarageFilters, type GarageSort,
 } from './ui/screens';
@@ -34,7 +34,7 @@ const defaultFilters: GarageFilters = { sort: 'recent', rarity: '', carClass: ''
 
 let game = createGame();
 let screen: Screen = 'cases';
-let selectedCase: CaseId = 'junkyard';
+let selectedCase: CaseId | null = null;
 let careerEntry: CareerEventId | null = null;
 let caseReel: ReturnType<typeof buildCaseReel> | null = null;
 let eventId: EventId = 'drag';
@@ -101,6 +101,7 @@ function gameScreen() {
     case 'cases': {
       const unlimited = hasUnlimitedCoins();
       const now = gameClockNow();
+      if (!selectedCase) return caseCollectionScreen(game, unlimited ? 0 : junkyardRemainingMs(game, now));
       const canOpen = unlimited || (selectedCase === 'junkyard'
         ? junkyardRemainingMs(game, now) === 0
         : game.coins >= casePrice(selectedCase));
@@ -138,7 +139,7 @@ function toggleSandbox() {
   sandbox = !sandbox;
   game = readSave(localStorage, activeSaveKey());
   screen = 'cases';
-  selectedCase = game.pendingCaseType ?? 'junkyard';
+  selectedCase = game.pendingCaseType ?? null;
   careerEntry = null;
   caseReel = null;
   notice = '';
@@ -153,7 +154,7 @@ function render(focus?: 'heading' | RestoreFocus) {
     : game.pendingRace ? (game.pendingRace.careerEventId ? 'career' : 'races') : screen;
   const view = game.pendingCase || game.pendingRace
     ? `${activeScreen}:${animation ?? 'result'}`
-    : screen === 'cases' ? `cases:${selectedCase}`
+    : screen === 'cases' ? `cases:${selectedCase ?? 'collection'}`
     : screen === 'career' && careerEntry ? `career:${careerEntry}` : screen;
   const transition = view !== renderedView;
   renderedView = view;
@@ -265,6 +266,7 @@ function dismissResult(next: Screen, action: 'keep' | 'sell' = 'keep') {
 function beginCase() {
   const opened = game.progress.casesOpened;
   const caseId = selectedCase;
+  if (!caseId) return;
   let starterDraw = false;
   void transact((latest) => {
     if (opened !== latest.progress.casesOpened) throw new Error('Progress changed in another tab. Review the current case.');
@@ -296,7 +298,7 @@ function resetProgress(message: string) {
   if (!window.confirm(message)) return;
   void transact(createGame, () => {
     screen = 'cases';
-    selectedCase = 'junkyard';
+    selectedCase = null;
     careerEntry = null;
     eventId = 'drag';
     tactic = 'Balanced';
@@ -344,7 +346,10 @@ function handleAction(button: HTMLButtonElement) {
   }
 
   switch (action) {
-    case 'nav-cases': changeScreen('cases'); break;
+    case 'nav-cases':
+      selectedCase = null;
+      changeScreen('cases');
+      break;
     case 'nav-garage': changeScreen('garage'); break;
     case 'nav-races': changeScreen('races'); break;
     case 'nav-career':
@@ -362,17 +367,28 @@ function handleAction(button: HTMLButtonElement) {
     }
     case 'select-case': {
       const choice = caseIds.find((candidate) => candidate === id);
-      if (!choice || choice === selectedCase) break;
+      if (!choice) break;
       selectedCase = choice;
       notice = '';
-      render({ action, id });
+      render('heading');
+      break;
+    }
+    case 'back-to-cases': {
+      const previous = selectedCase;
+      selectedCase = null;
+      notice = '';
+      render(previous ? { action: 'select-case', id: previous } : 'heading');
+      document.activeElement?.scrollIntoView({ block: 'nearest' });
       break;
     }
     case 'open-case': beginCase(); break;
     case 'start-race': beginRace(); break;
     case 'skip': showResult(); break;
-    case 'keep-case':
-    case 'race-cases': dismissResult('cases'); break;
+    case 'keep-case': dismissResult('cases'); break;
+    case 'race-cases':
+      selectedCase = null;
+      dismissResult('cases');
+      break;
     case 'sell-case': dismissResult('cases', 'sell'); break;
     case 'garage-case':
     case 'race-garage': dismissResult('garage'); break;

@@ -56,9 +56,52 @@ function junkyardStatus(ms: number): string {
   return ms > 0 ? `Next free case in ${cooldownTime(ms)}` : 'Free case ready';
 }
 
+function caseStage(id: CaseId): string {
+  return `<span class="case-stage" aria-hidden="true">
+    <span class="case-crate">
+      <span class="case-crate-lid"></span>
+      <span class="case-crate-face">
+        <span class="case-crate-plate">${icon(caseArtwork[id].badge)}</span>
+      </span>
+    </span>
+  </span>`;
+}
+
+export function caseCollectionScreen(game: GameState, remainingMs: number) {
+  const orderedCases = [...caseIds].sort((left, right) => casePrice(left) - casePrice(right));
+  return `<section class="case-screen" aria-labelledby="screen-title">
+    <header class="case-header">
+      <h1 id="screen-title" tabindex="-1">Case Collection</h1>
+      <dl class="case-stats" aria-label="Your progress">
+        <div><dt>In garage</dt><dd>${game.garage.length}</dd></div>
+        <div><dt>Cases opened</dt><dd>${game.progress.casesOpened}</dd></div>
+        <div><dt>Races finished</dt><dd>${game.progress.racesCompleted}</dd></div>
+      </dl>
+    </header>
+    <ul class="case-collection">
+      ${orderedCases.map((id) => `<li>
+        <button class="case-display panel" type="button" data-action="select-case" data-id="${id}" data-case-theme="${id}"
+          aria-labelledby="collection-name-${id}" aria-describedby="collection-price-${id}">
+          ${caseStage(id)}
+          <span class="case-display-caption">
+            <strong id="collection-name-${id}">${cases[id].name}</strong>
+            <span class="case-display-price" id="collection-price-${id}">${id === 'junkyard'
+              ? `<span>Free</span><span data-junkyard-status>${collectionAvailability(remainingMs)}</span>`
+              : `${icon('coin')} ${money(casePrice(id))} coins`}</span>
+          </span>
+        </button>
+      </li>`).join('')}
+    </ul>
+  </section>`;
+}
+
+function collectionAvailability(ms: number): string {
+  return ms > 0 ? `in ${cooldownTime(ms)}` : 'Ready';
+}
+
 export function updateCaseCountdown(root: ParentNode, remainingMs: number): void {
   const status = root.querySelector<HTMLElement>('[data-junkyard-status]');
-  const shortStatus = remainingMs > 0 ? cooldownTime(remainingMs) : 'Free';
+  const shortStatus = collectionAvailability(remainingMs);
   if (status && status.textContent !== shortStatus) status.textContent = shortStatus;
   const countdown = root.querySelector<HTMLElement>('[data-testid="junkyard-countdown"]');
   const button = root.querySelector<HTMLButtonElement>('[data-junkyard-open]');
@@ -77,36 +120,14 @@ export function casesScreen(game: GameState, activeCase: CaseId, canOpen: boolea
   const artwork = caseArtwork[activeCase];
   const featuredCar = pool.find(({ id }) => id === artwork.featuredCarId) ?? pool[0];
   return `<section class="case-screen" data-case-theme="${activeCase}" aria-labelledby="screen-title">
-    <header class="case-header">
-      <h1 id="screen-title" tabindex="-1">Cases</h1>
-      <dl class="case-stats" aria-label="Your progress">
-        <div><dt>In garage</dt><dd>${game.garage.length}</dd></div>
-        <div><dt>Cases opened</dt><dd>${game.progress.casesOpened}</dd></div>
-        <div><dt>Races finished</dt><dd>${game.progress.racesCompleted}</dd></div>
-      </dl>
-    </header>
-    <div class="case-selector" role="group" aria-label="Select a case">
-      ${caseIds.map((id) => `<button class="case-option" type="button" data-action="select-case" data-id="${id}"
-        data-case-theme="${id}" aria-label="${cases[id].name}" aria-describedby="case-option-price-${id}" aria-pressed="${id === activeCase}">
-        <span class="case-option-icon">${icon(caseArtwork[id].badge)}</span>
-        <span class="case-option-label"><strong>${cases[id].name.replace(/ Case$/, '')}</strong>
-          <small id="case-option-price-${id}"${id === 'junkyard' ? ' data-junkyard-status' : ''}>${id === 'junkyard'
-            ? remainingMs > 0 ? cooldownTime(remainingMs) : 'Free'
-            : `${money(casePrice(id))} coins`}</small></span>
-      </button>`).join('')}
+    <div class="case-back">
+      <button class="button button-secondary" type="button" data-action="back-to-cases"><span aria-hidden="true">←</span> Back to Cases</button>
     </div>
     <div class="case-grid">
-      <article class="case-feature panel" aria-labelledby="selected-case-title">
-        <div class="case-stage" aria-hidden="true">
-          <div class="case-crate">
-            <span class="case-crate-lid"></span>
-            <span class="case-crate-face">
-              <span class="case-crate-plate">${icon(artwork.badge)}</span>
-            </span>
-          </div>
-        </div>
+      <article class="case-feature panel" aria-labelledby="screen-title">
+        ${caseStage(activeCase)}
         <div class="case-content">
-          <h2 id="selected-case-title">${selected.name}</h2>
+          <h1 id="screen-title" tabindex="-1">${selected.name}</h1>
           <button type="button" class="button button-primary case-open-button" data-action="open-case"
             ${free ? 'data-junkyard-open aria-describedby="junkyard-countdown"' : 'aria-describedby="selected-case-price"'}${(free ? remainingMs === 0 : canOpen) ? '' : ' disabled'}>
             ${icon('cases')} ${free ? 'Open Free Case' : 'Open Case'}

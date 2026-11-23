@@ -3,15 +3,23 @@ import { caseIds, casePool, cases } from '../../src/game/cases';
 import { cars, rarities } from '../../src/game/config';
 import { createGame, storageKey } from '../../src/game/save';
 
-test('selecting a case updates the action, exact odds and the visible pool', async ({ page }) => {
+test('the collection displays all eight models in price order and opens their details', async ({ page }) => {
   await page.goto('./');
+  const collection = page.getByRole('region', { name: 'Case Collection' });
+  const choices = collection.getByRole('button');
+  await expect(choices).toHaveCount(8);
+  await expect(collection.locator('.case-crate')).toHaveCount(8);
+  expect(await choices.evaluateAll((buttons) => buttons.map((button) => button.getAttribute('data-id')))).toEqual(caseIds);
+  await expect(choices.first()).toContainText('Free');
+  await expect(page.getByRole('button', { name: 'Open Free Case', exact: true })).toHaveCount(0);
   const pool = page.locator('details').filter({ has: page.getByText('Vehicle Pool', { exact: true }) });
   for (const id of caseIds) {
     const entry = cases[id];
     const selection = page.getByRole('button', { name: entry.name, exact: true });
     await selection.click();
-    await expect(selection).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('heading', { name: entry.name, exact: true })).toBeVisible();
+    await expect(collection).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: entry.name, exact: true })).toBeFocused();
+    await expect(page.locator('.case-crate')).toHaveCount(1);
     const action = page.getByRole('button', { name: id === 'junkyard' ? 'Open Free Case' : 'Open Case', exact: true });
     if (id === 'junkyard') await expect(action).toBeEnabled();
     else await expect(action).toBeDisabled();
@@ -28,6 +36,8 @@ test('selecting a case updates the action, exact odds and the visible pool', asy
     await expect(pool.locator('article')).toHaveCount(casePool(id, id === 'junkyard').length);
     const visibleTiers = await pool.locator('.rarity-badge').allTextContents();
     expect(visibleTiers.every((tier) => rarities.some((rarity) => tier.trim() === rarity && entry.odds[rarity] > 0))).toBe(true);
+    await page.getByRole('button', { name: 'Back to Cases', exact: true }).click();
+    await expect(selection).toBeFocused();
   }
 });
 

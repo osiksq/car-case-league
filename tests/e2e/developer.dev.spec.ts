@@ -25,6 +25,7 @@ test('infinite money grants cars without debiting the isolated wallet', async ({
   const toggle = panel.getByRole('switch', { name: 'Infinite Money' });
 
   await expect(wallet).toHaveText('60');
+  await page.getByRole('button', { name: 'Junkyard Case', exact: true }).click();
   await openCase(page, true);
   await page.getByRole('button', { name: 'Keep', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Open Free Case', exact: true })).toBeDisabled();
@@ -36,6 +37,7 @@ test('infinite money grants cars without debiting the isolated wallet', async ({
   await expect(wallet).toHaveText('∞');
   await panel.getByRole('button', { name: 'Close', exact: true }).click();
 
+  await page.getByRole('button', { name: 'Back to Cases', exact: true }).click();
   await page.getByRole('button', { name: 'Rookie Case', exact: true }).click();
   await openCase(page);
   await page.getByRole('button', { name: 'Keep', exact: true }).click();
@@ -54,6 +56,7 @@ test('infinite money grants cars without debiting the isolated wallet', async ({
 
 test('test credits use normal prices and reset requires confirmation', async ({ page }) => {
   await page.goto('./');
+  await page.getByRole('button', { name: 'Junkyard Case', exact: true }).click();
   await openCase(page, true);
   await page.getByRole('button', { name: 'Keep', exact: true }).click();
   const developer = page.getByRole('button', { name: 'DEV', exact: true });
@@ -64,6 +67,7 @@ test('test credits use normal prices and reset requires confirmation', async ({ 
   await expect(wallet).toHaveText('10,060');
   await panel.getByRole('button', { name: 'Close', exact: true }).click();
 
+  await page.getByRole('button', { name: 'Back to Cases', exact: true }).click();
   await page.getByRole('button', { name: 'Rookie Case', exact: true }).click();
   await openCase(page);
   await expect(wallet).toHaveText('9,810');
@@ -76,6 +80,7 @@ test('test credits use normal prices and reset requires confirmation', async ({ 
   page.once('dialog', (dialog) => dialog.accept());
   await reset.click();
   await expect(wallet).toHaveText('60');
+  await page.getByRole('button', { name: 'Junkyard Case', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Open Free Case', exact: true })).toBeEnabled();
 });
 
@@ -93,12 +98,14 @@ test('infinite money unlocks all eight cases without debiting the wallet', async
     await openCase(page, id === 'junkyard');
     await expect(page.locator('.case-result-screen .eyebrow')).toHaveText(new RegExp(name, 'i'));
     await page.getByRole('button', { name: 'Keep', exact: true }).click();
+    await page.getByRole('button', { name: 'Back to Cases', exact: true }).click();
   }
 
   await developer.click();
   await panel.getByRole('switch', { name: 'Infinite Money' }).click();
   await panel.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByTestId('coin-balance')).toHaveText('60');
+  await page.getByRole('button', { name: 'Hyper Case', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Open Case', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'My Garage', exact: true }).click();
   await expect(page.getByTestId('garage-car')).toHaveCount(8);
