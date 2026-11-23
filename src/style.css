@@ -883,6 +883,7 @@ select {
 .roulette-viewport {
   position: relative;
   isolation: isolate;
+  contain: layout paint;
   overflow: hidden;
   margin-block: .9rem;
   padding-block: 1rem;
@@ -900,7 +901,7 @@ select {
   pointer-events: none;
 }
 
-.roulette-track { display: flex; width: max-content; gap: 12px; }
+.roulette-track { display: flex; width: max-content; gap: 12px; will-change: transform; }
 
 .roulette-marker {
   position: absolute;

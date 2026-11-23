@@ -1,6 +1,7 @@
 import '../race-scene.css';
 import { events, type Car, type EventId } from '../game/config';
 import type { RacePhase, RaceResult } from '../game/race';
+import { runForegroundAnimation } from './animation-clock';
 import { escapeHtml } from './components';
 import { useCarImage } from './race-car-art';
 
@@ -98,6 +99,21 @@ interface Frame {
   finished: number;
 }
 
+function canvasBudget(width: number, height: number) {
+  const narrow = width < 600;
+  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  const constrained = navigator.hardwareConcurrency <= 4 || (memory !== undefined && memory <= 4);
+  const lighter = narrow || constrained;
+  const maxPixels = narrow ? 410_000 : constrained ? 750_000 : 1_520_000;
+  const maxScale = narrow ? 1.4 : constrained ? 1.35 : 1.7;
+  return {
+    dpr: Math.min(window.devicePixelRatio || 1, maxScale, Math.sqrt(maxPixels / (width * height))),
+    rain: narrow ? 24 : constrained ? 34 : 58,
+    curveSamples: lighter ? 8 : 12,
+    reflection: !constrained,
+  };
+}
+
 function makePainter(canvas: HTMLCanvasElement, scene: HTMLElement, race: RaceResult, track: Track) {
   const context = canvas.getContext('2d', { alpha: false });
   if (!context) return null;
@@ -109,16 +125,19 @@ function makePainter(canvas: HTMLCanvasElement, scene: HTMLElement, race: RaceRe
   const endurance = race.eventId === 'endurance';
   let width = 1;
   let height = 1;
+  let budget = canvasBudget(width, height);
   let sky: CanvasGradient;
   let asphalt: CanvasGradient;
   const resize = () => {
     const bounds = canvas.getBoundingClientRect();
-    const dpr = Math.min(1.6, window.devicePixelRatio || 1);
     width = Math.max(1, bounds.width);
     height = Math.max(1, bounds.height);
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    budget = canvasBudget(width, height);
+    const pixelWidth = Math.max(1, Math.round(width * budget.dpr));
+    const pixelHeight = Math.max(1, Math.round(height * budget.dpr));
+    if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
+    if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
+    ctx.setTransform(pixelWidth / width, 0, 0, pixelHeight / height, 0, 0);
 
     sky = ctx.createLinearGradient(0, 0, 0, height * .62);
     sky.addColorStop(0, track.sky);
@@ -133,21 +152,17 @@ function makePainter(canvas: HTMLCanvasElement, scene: HTMLElement, race: RaceRe
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
 
-  function makeView(progress: number) {
-    const camera = progress * (drag ? 40 : endurance ? 29 : 34);
-    const turn = progress / 100 * TAU * track.rhythm;
-    return {
-      camera,
-      center: (x: number) => height * .645 + track.curve * height * (
-        .7 * Math.sin(turn + (x / width - .5) * 2.8) + .31 * Math.sin(turn * 1.2)
-      ),
-    };
-  }
+  let turn = 0;
+  let curveOffset = 0;
+  const view = {
+    camera: 0,
+    center: (x: number) => height * .645 + track.curve * height * (.7 * Math.sin(turn + (x / width - .5) * 2.8) + curveOffset),
+  };
 
-  type View = ReturnType<typeof makeView>;
+  type View = typeof view;
   function stripe(view: View, color: string | CanvasGradient, top: number, bottom: number, start = 0, end = width) {
     const length = end - start;
-    const sampleCount = clamp(Math.ceil(length / 105), 2, 12);
+    const sampleCount = clamp(Math.ceil(length / 105), 2, budget.curveSamples);
     ctx.beginPath();
     ctx.moveTo(start, view.center(start) + top);
     for (let index = 1; index <= sampleCount; index++) {
@@ -300,7 +315,7 @@ function makePainter(canvas: HTMLCanvasElement, scene: HTMLElement, race: RaceRe
     ctx.beginPath();
     ctx.ellipse(0, 0, size * .42, size * .053, 0, 0, TAU);
     ctx.fill();
-    if (wet) {
+    if (wet && budget.reflection) {
       ctx.save();
       ctx.scale(-1, -.48);
       ctx.globalAlpha = .23;
@@ -320,11 +335,10 @@ function makePainter(canvas: HTMLCanvasElement, scene: HTMLElement, race: RaceRe
 
   function rain(frame: Frame) {
     if (!wet) return;
-    const amount = width < 600 ? 28 : 58;
     const wind = frame.age * .22;
     const fall = frame.age * .53;
     ctx.beginPath();
-    for (let index = 1; index <= amount; index++) {
+    for (let index = 1; index <= budget.rain; index++) {
       const x = (index * 168.27 + wind) % (width + 22);
       const y = (index * 381.17 + fall) % (height + 26);
       ctx.moveTo(x, y);
@@ -337,7 +351,10 @@ function makePainter(canvas: HTMLCanvasElement, scene: HTMLElement, race: RaceRe
 
   const paint = (frame: Frame) => {
     const best = Math.max(frame.player, frame.opponent);
-    const view = makeView((frame.player + frame.opponent) / 2 + frame.finished / finishHold * 1.64);
+    const progress = (frame.player + frame.opponent) / 2 + frame.finished / finishHold * 1.64;
+    view.camera = progress * (drag ? 40 : endurance ? 29 : 34);
+    turn = progress / 100 * TAU * track.rhythm;
+    curveOffset = .31 * Math.sin(turn * 1.2);
     const carWidth = clamp(width * .24, 103, Math.min(height * .48, 225));
     const front = width * (.28 + .39 * Math.sin(Math.min(frame.playhead * 2.4, 1) * Math.PI / 2));
     const gap = Math.abs(frame.player - frame.opponent);
@@ -365,8 +382,7 @@ export function playRaceScene(root: HTMLElement, race: RaceResult, done: () => v
   const scene = root.querySelector<HTMLElement>('[data-race-scene]');
   const canvas = scene?.querySelector<HTMLCanvasElement>('[data-race-canvas]');
   if (!scene || !canvas) {
-    const frame = requestAnimationFrame(done);
-    return () => cancelAnimationFrame(frame);
+    return runForegroundAnimation(scene, () => true, done);
   }
   const track = tracks[race.eventId];
   const painter = makePainter(canvas, scene, race, track);
@@ -374,13 +390,10 @@ export function playRaceScene(root: HTMLElement, race: RaceResult, done: () => v
   const callout = scene.querySelector<HTMLElement>('[data-race-callout]');
   const stageLabel = scene.querySelector<HTMLElement>('[data-race-stage-label]');
   const announcement = scene.querySelector<HTMLElement>('[data-race-announcement]');
-  const startTime = performance.now();
   const end = countdown + track.duration;
   let lastCount = 0;
   let started = false;
   let finished = false;
-  let stopped = false;
-  let frameId = 0;
   let lastUi = -100;
   let stage = '';
   let previousLeader: Side | undefined;
@@ -389,10 +402,12 @@ export function playRaceScene(root: HTMLElement, race: RaceResult, done: () => v
   let lastPaceProgress = 0;
   let enginePace = 0;
   let lastPaint = -1;
+  const frame = { age: 0, playhead: 0, player: 0, opponent: 0, finished: 0 };
 
-  const paint = (current: number) => {
-    if (stopped) return;
-    const age = Math.max(0, current - startTime);
+  const stop = runForegroundAnimation(scene, (age) => {
+    const paintFrame = Math.floor(age * 60 / 1000);
+    if (paintFrame === lastPaint && age < end + finishHold) return false;
+    lastPaint = paintFrame;
     const timeOnTrack = age - countdown;
     const playhead = clamp(timeOnTrack / track.duration, 0, 1);
     const player = sampleRaceProgress(race.phases, 'player', playhead);
@@ -457,26 +472,19 @@ export function playRaceScene(root: HTMLElement, race: RaceResult, done: () => v
       if (announcement) announcement.textContent = race.won ? 'You crossed the finish line first.' : 'The rival crossed the finish line first.';
       onCue?.({ type: 'finish' });
     }
-    const paintFrame = Math.floor(age * 60 / 1000);
-    if (paintFrame !== lastPaint || transition || age >= end + finishHold) {
-      painter?.paint({ age, playhead, player, opponent, finished: coast });
-      lastPaint = paintFrame;
-    }
-    if (age >= end + finishHold) {
-      stop();
-      done();
-    } else {
-      frameId = requestAnimationFrame(paint);
-    }
-  };
-
-  function stop() {
-    if (stopped) return;
-    stopped = true;
-    cancelAnimationFrame(frameId);
+    frame.age = age;
+    frame.playhead = playhead;
+    frame.player = player;
+    frame.opponent = opponent;
+    frame.finished = coast;
+    painter?.paint(frame);
+    return age >= end + finishHold;
+  }, () => {
     painter?.disconnect();
-  }
-
-  paint(startTime);
-  return stop;
+    done();
+  });
+  return () => {
+    stop();
+    painter?.disconnect();
+  };
 }
