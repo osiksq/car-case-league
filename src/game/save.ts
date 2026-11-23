@@ -1,4 +1,4 @@
-import { cars, events, tactics, type EventId, type Tactic } from './config';
+import { cars, events, stats, tactics, type EventId, type Tactic } from './config';
 import {
   careerEvents, completeCareerEvent, createCareerProgress, isCareerEventId,
   type CareerEvent, type CareerEventId, type CareerProgress,
@@ -248,6 +248,17 @@ function isRacePhase(value: unknown): value is RacePhase {
   return isObject(value) && isNumberInRange(value.player, 100) && isNumberInRange(value.opponent, 100);
 }
 
+function isScoreDelta(value: unknown): boolean {
+  return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 120;
+}
+
+function isValidBreakdown(value: unknown): boolean {
+  if (!isObject(value)) return false;
+  const { stats: gaps, tacticDelta, playerVariation, rivalPaceDelta, rivalVariation } = value;
+  return isObject(gaps) && stats.every((stat) => isScoreDelta(gaps[stat]))
+    && [tacticDelta, playerVariation, rivalPaceDelta, rivalVariation].every(isScoreDelta);
+}
+
 function isRaceResult(value: unknown): value is RaceResult {
   return isObject(value) && typeof value.id === 'string' && /^race-[1-9]\d*$/.test(value.id)
     && typeof value.eventId === 'string' && Object.hasOwn(events, value.eventId)
@@ -317,6 +328,7 @@ export function readSave(
     // can be restored without changing the wallet or handing out awards again.
     let career = createCareerProgress();
     const races = value.races.map(({ careerEventId, careerAward: _award, ...race }): RaceResult => {
+      if (race.breakdown !== undefined && !isValidBreakdown(race.breakdown)) delete race.breakdown;
       if (!isCareerEventId(careerEventId) || careerEvents[careerEventId].eventId !== race.eventId) return race;
       const completion = race.won ? completeCareerEvent(career, careerEventId) : { progress: career, award: undefined };
       career = completion.progress;

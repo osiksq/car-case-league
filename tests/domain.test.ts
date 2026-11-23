@@ -1,7 +1,10 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { cars, events, rarities, stats, tacticModifiers } from '../src/game/config';
+import { careerEvents } from '../src/game/career';
+import { cars, events, rarities, stats, tactics, tacticModifiers } from '../src/game/config';
 import { buildCaseReel, caseIds, casePool, casePrice, cases, drawCaseReward } from '../src/game/cases';
 import { economy } from '../src/game/economy';
+import { previewRaceOpponent, simulateRace } from '../src/game/race';
 import {
   createGame,
   finishCase,
@@ -228,6 +231,116 @@ describe('garage', () => {
 });
 
 describe('races', () => {
+  it('matches the previewed opponent in all four disciplines at the same seed', () => {
+    expect(Object.keys(events)).toEqual(['drag', 'circuit', 'wet-circuit', 'endurance']);
+    for (const eventId of ['drag', 'circuit', 'wet-circuit', 'endurance'] as const) {
+      for (const car of cars) {
+        for (const seed of [0, 41, 120, 193]) {
+          const rival = previewRaceOpponent(eventId, car, seed);
+          expect(simulateRace('race-1', eventId, 'Safe', car, seed).opponentCarId).toBe(rival.id);
+          expect(simulateRace('race-1', eventId, 'Push', car, seed).opponentCarId).toBe(rival.id);
+        }
+      }
+    }
+  });
+
+  it('makes wet handling and endurance reliability matter in their track weights', () => {
+    expect(events['wet-circuit'].weights.handling).toBeGreaterThan(events.circuit.weights.handling);
+    expect(events['wet-circuit'].weights.reliability).toBeGreaterThan(events.circuit.weights.reliability);
+    expect(events.endurance.weights.reliability).toBeGreaterThan(events['wet-circuit'].weights.reliability);
+    for (const track of Object.values(events)) {
+      expect(Object.values(track.weights).reduce((sum, weight) => sum + weight, 0)).toBe(100);
+    }
+  });
+
+  it('rewards Safe in the new disciplines while leaving comparable rivals a chance', () => {
+    for (const eventId of ['wet-circuit', 'endurance'] as const) {
+      for (const index of [0, 4, 6, 11]) {
+        const car = cars[index];
+        const seeds = Array.from({ length: 512 }, (_, seed) => seed);
+        const wins = (tactic: 'Safe' | 'Balanced') =>
+          seeds.filter((seed) => simulateRace('race-1', eventId, tactic, car, seed).won).length;
+        expect(wins('Safe'), `${events[eventId].name}, ${car.name}`).toBeLessThan(seeds.length);
+        expect(wins('Safe')).toBeGreaterThan(wins('Balanced'));
+      }
+    }
+  });
+
+  it('records a monotonic, faithful finish and allows real lead changes in each discipline', () => {
+    for (const eventId of ['drag', 'circuit', 'wet-circuit', 'endurance'] as const) {
+      let sawOvertake = false;
+      for (let seed = 0; seed < 64; seed++) {
+        const player = cars[seed % cars.length];
+        const result = simulateRace('race-1', eventId, 'Push', player, seed);
+        const winner = result.won ? 'player' : 'opponent';
+        const loser = result.won ? 'opponent' : 'player';
+        expect(result.phases[0]).toEqual({ player: 0, opponent: 0 });
+        expect(result.phases.at(-1)?.[winner]).toBe(100);
+        expect(result.phases.at(-1)?.[loser]).toBeLessThan(100);
+        expect(result.phases.slice(0, -1).every((phase) => phase.player < 100 && phase.opponent < 100)).toBe(true);
+        let previousLead = 0;
+        for (const [index, phase] of result.phases.entries()) {
+          const previous = result.phases[index - 1];
+          expect(phase.player).toBeGreaterThanOrEqual(previous?.player ?? 0);
+          expect(phase.opponent).toBeGreaterThanOrEqual(previous?.opponent ?? 0);
+          const lead = Math.sign(phase.player - phase.opponent);
+          if (lead && previousLead && lead !== previousLead) sawOvertake = true;
+          if (lead) previousLead = lead;
+        }
+      }
+      expect(sawOvertake, events[eventId].name).toBe(true);
+    }
+  });
+
+  it('explains the exact score gap and restores the canonical breakdown and payout', () => {
+    const player = cars.find((car) => car.id === 'sorevik-t9')!;
+    const opponent = cars.find((car) => car.id === 'orvane-eclipse')!;
+    const result = simulateRace('race-1', 'circuit', 'Safe', player, 120, {
+      opponent, name: 'Career rival', paceRatio: 0.97, volatility: 0.065,
+    });
+    const breakdown = result.breakdown!;
+    const statsDelta = Object.values(breakdown.stats).reduce((sum, delta) => sum + delta, 0);
+    expect(statsDelta + breakdown.tacticDelta + breakdown.playerVariation
+      - breakdown.rivalPaceDelta - breakdown.rivalVariation).toBeCloseTo(result.playerScore - result.opponentScore, 10);
+
+    const ready = starter();
+    const started = startRace(ready, 'wet-circuit', 'Safe', 14, 100_000);
+    const storage = memoryStorage();
+    writeSave(storage, started);
+    const restored = readSave(storage);
+    expect(restored.pendingRace?.breakdown).toEqual(started.pendingRace?.breakdown);
+    expect(restored.pendingRace?.won).toBe(started.pendingRace?.won);
+    expect(restored.coins).toBe(ready.coins + started.pendingRace!.reward);
+    expect(finishRace(restored).coins).toBe(restored.coins);
+
+    const malformed = { ...started.pendingRace, breakdown: { tacticDelta: 'invalid' } };
+    storage.setItem(storageKey, JSON.stringify({ ...started, pendingRace: malformed, races: [malformed] }));
+    const recovered = readSave(storage);
+    expect(recovered.pendingRace?.breakdown).toBeUndefined();
+    expect(recovered.pendingRace?.won).toBe(started.pendingRace?.won);
+    expect(recovered.coins).toBe(started.coins);
+  });
+
+  it('preserves scores and outcomes from Alpha 0.3 for every career event', () => {
+    const hash = createHash('sha256');
+    for (const event of Object.values(careerEvents)) {
+      const rival = {
+        opponent: cars.find((car) => car.id === event.rivalCarId)!,
+        name: event.rivalName, paceRatio: event.paceRatio, volatility: event.rivalVolatility,
+      };
+      for (const car of cars) {
+        for (const tactic of tactics) {
+          for (let seed = 0; seed < 32; seed++) {
+            const { opponentCarId, playerScore, opponentScore, won } = simulateRace('fixture', event.eventId, tactic, car, seed, rival);
+            hash.update(JSON.stringify([opponentCarId, playerScore, opponentScore, won]));
+          }
+        }
+      }
+    }
+    // Captured from the previous simulator across eight events, forty cars, three tactics and 32 seeds.
+    expect(hash.digest('hex')).toBe('eab3eafe2d61cd607451b8592dae3f9aec91a9ffda92023a40358e566e215bc3');
+  });
+
   it('reproduces the same result and phases with the same seed', () => {
     const ready = starter();
     const raced = startRace(ready, 'circuit', 'Safe', 193, 100_000);

@@ -10,6 +10,7 @@ test('production excludes developer controls and ignores development data', asyn
   await page.goto('./?dev=1&infiniteMoney=true');
   await expect(page.getByRole('button', { name: 'DEV', exact: true })).toHaveCount(0);
   await expect(page.getByTestId('coin-balance')).toHaveText('60');
+  await page.getByRole('button', { name: 'Junkyard Case', exact: true }).click();
   await page.getByRole('button', { name: 'Open Free Case', exact: true }).click();
   await page.getByRole('button', { name: 'Skip Animation', exact: true }).click();
   await page.getByRole('button', { name: 'Keep', exact: true }).click();
@@ -35,6 +36,7 @@ test('public sandbox opens paid cases without modifying the normal save', async 
   }
 
   await page.goto('./');
+  await button('Junkyard Case').click();
   await button('Open Free Case').click();
   await button('Keep').click();
   await expect(button('Open Free Case')).toBeDisabled();
@@ -54,6 +56,7 @@ test('public sandbox opens paid cases without modifying the normal save', async 
 
   await toggleSandbox();
   await expect(wallet).toHaveText('60');
+  await button('Junkyard Case').click();
   await expect(button('Open Free Case')).toBeDisabled();
   await page.reload();
   await expect(wallet).toHaveText('60');

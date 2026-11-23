@@ -1,0 +1,99 @@
+.race-scene {
+  min-width: 0;
+  overflow: hidden;
+  border-color: #303945;
+  background: #111722;
+}
+
+.race-scene-stage {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: #111722;
+}
+
+.race-scene-stage canvas {
+  display: block;
+  width: 100%;
+  height: clamp(270px, 43vw, 500px);
+}
+
+.race-scene-stage [data-scene-car] { display: none; }
+
+.race-scene-overlay {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  gap: .55rem;
+  padding: clamp(.54rem, 1.7vw, 1.2rem);
+  background: linear-gradient(180deg, #090d17c2, transparent);
+  pointer-events: none;
+}
+
+.race-scene-session,
+.race-scene-clock {
+  min-width: 0;
+  width: max-content;
+  max-width: 72%;
+  padding: .32rem .56rem;
+  border: 1px solid #c0cde13b;
+  border-radius: 5px;
+  background: #101622db;
+  color: #e3ecf4;
+  font-size: clamp(.64rem, 1.3vw, .8rem);
+  font-weight: 760;
+}
+
+.race-scene-clock { font-variant-numeric: tabular-nums; }
+
+.race-scene-callout {
+  position: absolute;
+  inset: 11% 0 auto;
+  color: #f4f8ff;
+  font-size: clamp(2.8rem, 7vw, 7rem);
+  font-weight: 900;
+  letter-spacing: -.065em;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 6px 26px #090d18f2, 0 0 25px #f5fffb54;
+  pointer-events: none;
+}
+
+.race-scene[data-race-status='racing'] .race-scene-callout { color: #cbf96e; text-shadow: 0 5px 32px #86ca55a8; }
+.race-scene[data-race-status='finish'] .race-scene-callout { color: #f8fbff; font-size: clamp(1.8rem, 5.4vw, 4rem); }
+
+.race-scene-legend {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: .5rem;
+  padding: .65rem clamp(.55rem, 2vw, 1.12rem);
+  border-top: 1px solid #334155;
+}
+
+.race-scene-legend > div { display: flex; min-width: 0; align-items: center; gap: .4rem; }
+.race-scene-legend > div:last-child { justify-content: end; text-align: end; }
+.race-scene-legend strong, .race-scene-legend small { display: block; overflow-wrap: anywhere; }
+.race-scene-legend strong { color: #eff3f9; font-size: clamp(.72rem, 1.6vw, .95rem); line-height: 1.18; }
+.race-scene-legend small { color: #a6b4c7; font-size: .65rem; }
+.race-scene-phase { max-width: 9rem; color: #b9c8d9; font-size: clamp(.57rem, 1.2vw, .77rem); text-align: center; }
+.race-scene-dot { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; }
+.race-scene-dot-player { background: #cbf96e; }
+.race-scene-dot-rival { background: #a8c0ff; }
+
+.race-scene-reader {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  .race-scene-legend { gap: .25rem; }
+  .race-scene-legend > div { gap: .28rem; }
+  .race-scene-dot { width: 5px; height: 5px; }
+  .race-scene-phase { max-width: 5.5rem; }
+}
