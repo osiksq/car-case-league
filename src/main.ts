@@ -7,7 +7,7 @@ import { events, tactics, type EventId, type Tactic } from './game/config';
 import { gameClockNow } from './game/economy';
 import { addDeveloperCoins, developerButton, developerDialog, developerSaveKey, openDeveloperCase } from './dev/developer';
 import {
-  createGame, finishCase, finishRace, junkyardRemainingMs, openCase, readSave, selectCar, sellCar,
+  createGame, finishCase, finishRace, junkyardRemainingMs, openCase, readSave, resetGame, selectCar, sellCar,
   startCareerRace, startRace, storageKey, toggleLock, writeSave, type GameState,
 } from './game/save';
 import { animateRace, animateRoulette } from './ui/animation';
@@ -163,7 +163,7 @@ function dialogMarkup() {
     <div class="panel-heading"><h2 id="settings-title">Settings</h2></div>
     <label class="motion-setting"><input type="checkbox" data-filter="motion"${reducedMotion() ? ' checked' : ''}${mediaMotion.matches ? ' disabled' : ''}> Reduce Motion</label>
     ${mediaMotion.matches ? '<p class="action-hint">Your device has requested reduced motion.</p>' : ''}
-    <p>Reset clears your cars, coins, race history and career on this device.</p>
+    <p>Reset clears your cars, coins, race history and career on this device. The Junkyard cooldown continues.</p>
     <div class="button-row">
       <button type="button" class="button button-secondary" data-action="close-settings">Close</button>
       <button type="button" class="button button-secondary" data-action="reset">Reset Progress</button>
@@ -390,7 +390,7 @@ function beginRace() {
 
 function resetProgress(message: string) {
   if (!window.confirm(message)) return;
-  void transact(createGame, () => {
+  void transact(resetGame, () => {
     screen = 'cases';
     selectedCase = null;
     careerEntry = null;

@@ -6,17 +6,12 @@ describe('audio settings', () => {
   it('normalizes saved settings per channel and ignores invalid values', () => {
     expect(normalizeAudioSettings(null)).toEqual(defaultAudioSettings);
     expect(normalizeAudioSettings({ enabled: false, master: 120, engine: -5, effects: Number.NaN })).toEqual({
-      enabled: false,
-      master: 100,
-      engine: 0,
-      effects: defaultAudioSettings.effects,
+      enabled: false, master: 100, engine: 0, effects: defaultAudioSettings.effects,
     });
     expect(normalizeAudioSettings({ enabled: 'false', master: '40' })).toEqual(defaultAudioSettings);
   });
-});
 
-describe('audio activation', () => {
-  it('requires explicit activation and stays usable when the audio backend fails', () => {
+  it('requires activation and stays usable when creating the audio context fails', () => {
     const constructor = vi.fn(function () { throw new Error('No audio output'); });
     vi.stubGlobal('AudioContext', constructor);
     try {
@@ -27,79 +22,86 @@ describe('audio activation', () => {
       expect(constructor).not.toHaveBeenCalled();
       expect(() => audio.unlock()).not.toThrow();
       expect(constructor).toHaveBeenCalledOnce();
-      const reel = audio.reel();
-      expect(() => reel.cue('mechanism')).not.toThrow();
-      expect(() => { reel.stop(); race.stop(); }).not.toThrow();
+      expect(() => { audio.reel().stop(); race.stop(); }).not.toThrow();
     } finally {
       vi.unstubAllGlobals();
     }
   });
 
-  it('cleans up scoped sounds on hide or stop and resumes only the current engine', async () => {
+  it('loads real samples once, changes playback rate, and stops live and pending sounds', async () => {
     const active = new Set<object>();
-    const param = () => ({
-      setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn(), setTargetAtTime: vi.fn(),
-      cancelScheduledValues: vi.fn(), value: 0,
-    });
-    const sources: { frequency: ReturnType<typeof param> }[] = [];
+    const param = () => ({ setTargetAtTime: vi.fn(), setValueAtTime: vi.fn(), cancelScheduledValues: vi.fn(), value: 0 });
     const node = () => ({ connect: vi.fn(), disconnect: vi.fn() });
-    const source = () => {
-      const oscillator = {
-        ...node(), frequency: param(),
-        start: () => active.add(oscillator),
-        stop: (time?: number) => { if (time === undefined) active.delete(oscillator); },
+    type TestSource = ReturnType<typeof node> & {
+      playbackRate: ReturnType<typeof param>;
+      loop: boolean;
+      buffer: { file: string } | null;
+      start(): void;
+      stop(time?: number): void;
+    };
+    const sources: TestSource[] = [];
+    const makeSource = () => {
+      const source: TestSource = {
+        ...node(), playbackRate: param(), loop: false, buffer: null as { file: string } | null,
+        start: () => active.add(source), stop: (time?: number) => { if (time === undefined) active.delete(source); },
       };
-      sources.push(oscillator);
-      return oscillator;
+      sources.push(source);
+      return source;
     };
     const context = {
-      state: 'running',
-      currentTime: 1,
-      sampleRate: 100,
-      destination: node(),
+      state: 'running', currentTime: 1, destination: node(),
       createGain: () => ({ ...node(), gain: param() }),
-      createOscillator: source,
-      createBufferSource: source,
-      createBuffer: () => ({ getChannelData: () => new Float32Array(32) }),
-      createBiquadFilter: () => ({ ...node(), Q: param(), frequency: param() }),
+      createBufferSource: makeSource,
+      createBiquadFilter: () => ({ ...node(), frequency: param() }),
       createDynamicsCompressor: () => ({ ...node(), threshold: param(), ratio: param(), attack: param(), release: param() }),
+      decodeAudioData: async (file: string) => ({ file }),
       suspend: async () => { context.state = 'suspended'; },
       resume: async () => { context.state = 'running'; },
     };
-    const Constructor = vi.fn(function () { return context; });
-    vi.stubGlobal('AudioContext', Constructor);
+    const constructor = vi.fn(function () { return context; });
+    let releaseMythic: () => void = () => {};
+    const mythicPending = new Promise<void>((resolve) => { releaseMythic = resolve; });
+    const fetchSample = vi.fn(async (file: string) => {
+      if (file.endsWith('reward-mythic.mp3')) await mythicPending;
+      return { ok: true, arrayBuffer: async () => file };
+    });
+    vi.stubGlobal('AudioContext', constructor);
+    vi.stubGlobal('fetch', fetchSample);
     try {
       audio.unlock();
       audio.unlock();
-      expect(Constructor).toHaveBeenCalledOnce();
+      expect(constructor).toHaveBeenCalledOnce();
       const race = audio.race(cars[0]);
       race.cue({ type: 'start' });
-      expect(active.size).toBe(3);
-      race.cue({ type: 'engine', pace: .8 });
-      const targets = sources[1].frequency.setTargetAtTime.mock.calls.map(([frequency]) => frequency);
+      await vi.waitFor(() => expect(active.size).toBe(3));
+      const motor = sources.find((source) => source.loop)!;
+      expect(motor.buffer?.file).toMatch(/engine-vintage\.mp3$/);
+      race.cue({ type: 'engine', pace: .82 });
+      const targets = motor.playbackRate.setTargetAtTime.mock.calls.map(([rate]) => rate);
       expect(targets.at(-1)).toBeGreaterThan(targets[0]);
       audio.setVisible(false);
       expect(active.size).toBe(0);
       race.cue({ type: 'overtake' });
-      expect(active.size).toBe(0);
       audio.setVisible(true);
       expect(active.size).toBe(0);
       race.cue({ type: 'engine', pace: .7 });
-      expect(active.size).toBe(2);
-      audio.configure({ ...defaultAudioSettings, enabled: false });
-      expect(active.size).toBe(0);
-      audio.configure(defaultAudioSettings);
-      race.cue({ type: 'engine', pace: .8 });
-      expect(active.size).toBe(2);
+      expect(active.size).toBe(1);
       race.stop();
-      race.cue({ type: 'start' });
       expect(active.size).toBe(0);
+      expect(fetchSample.mock.calls.filter(([file]) => file.endsWith('engine-vintage.mp3'))).toHaveLength(1);
 
       const reel = audio.reel();
       reel.cue('mechanism');
       for (let i = 0; i < 20; i++) reel.cue('tick');
-      expect(active.size).toBe(6);
+      await vi.waitFor(() => expect(active.size).toBe(3));
       reel.stop();
+      expect(active.size).toBe(0);
+      audio.play({ reward: 'Mythic' });
+      audio.configure({ ...defaultAudioSettings, enabled: false });
+      audio.configure(defaultAudioSettings);
+      releaseMythic();
+      await vi.waitFor(() => expect(fetchSample.mock.calls.filter(([file]) => file.endsWith('reward-mythic.mp3'))).toHaveLength(1));
+      await new Promise((resolve) => setTimeout(resolve, 0));
       expect(active.size).toBe(0);
     } finally {
       audio.setVisible(false);

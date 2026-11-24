@@ -12,6 +12,7 @@ import {
   junkyardRemainingMs,
   openCase,
   readSave,
+  resetGame,
   selectCar,
   sellCar,
   startRace,
@@ -53,6 +54,21 @@ describe('Junkyard and paid cases', () => {
   it('keeps the case price fixed and rejects paid entry without enough coins', () => {
     expect(caseIds.map(casePrice)).toEqual([0, 250, 700, 2000, 5500, 9000, 16000, 30000]);
     expect(() => openCase(createGame(), 'rookie', 12, 100_000)).toThrow(/coins/i);
+  });
+
+  it('preserves the active Junkyard deadline when resetting progress or reloading', () => {
+    const storage = memoryStorage();
+    const openedAt = 100_000;
+    const readyAt = openedAt + economy.junkyardCooldownMs;
+    const opened = openCase(createGame(), 'junkyard', 12, openedAt);
+    const reset = resetGame(opened, openedAt + 1_000);
+    expect(reset).toEqual({ ...createGame(), timing: opened.timing });
+    writeSave(storage, reset);
+    const restored = readSave(storage, storageKey, readyAt - 1, openedAt);
+    expect(junkyardRemainingMs(restored, readyAt - 1)).toBe(1);
+    expect(() => openCase(restored, 'junkyard', 12, readyAt - 1)).toThrow(/ready in/i);
+    expect(openCase(restored, 'junkyard', 12, readyAt).garage).toHaveLength(1);
+    expect(resetGame(restored, readyAt)).toEqual(createGame());
   });
 
   it('keeps the exact first-case tiers and excludes cars that cannot clear Rookie', () => {

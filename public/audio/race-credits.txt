@@ -1,0 +1,43 @@
+Car Case League — Race audio credits
+
+CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
+CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/
+
+engine-vintage.mp3 — "1953 Studebaker Idle up to 6000rpm" by lonemonk, CC BY 4.0.
+https://freesound.org/people/lonemonk/sounds/238847/
+Adapted by cropping, mono mixing, filtering, crossfading the loop seam, adjusting gain and encoding as MP3.
+
+ignition.mp3 — "Ferrari Engine On Front" by Oscar_Patrick, CC BY 4.0.
+https://freesound.org/people/Oscar_Patrick/sounds/812434/
+Adapted by cropping, filtering, fading, adjusting gain and encoding as MP3.
+
+engine-sport.mp3 — "Car Engine: Maserati GranTurismo Switch to Sport Mode and Launch" by myeclecticself, CC0 1.0.
+https://freesound.org/people/myeclecticself/sounds/585215/
+Cropped, mixed to mono, filtered, crossfaded, level-adjusted and encoded as MP3.
+
+engine-hyper.mp3 — "Lambo idle and rev.mp3" by cheesepuff, CC0 1.0.
+https://freesound.org/people/cheesepuff/sounds/112075/
+Lamborghini Murciélago LP 670-4 SuperVeloce V12. Cropped, mixed to mono, filtered, crossfaded, level-adjusted and encoded as MP3.
+
+shift.mp3 — "stickshift.wav" by Heigh-hoo, CC0 1.0.
+https://freesound.org/people/Heigh-hoo/sounds/82807/
+
+pass.mp3 and finish.mp3 — "Car race, Nordschleife, VLN, several cars passing by, tyre squeal 02" by Dominik_W, CC0 1.0.
+https://freesound.org/people/Dominik_W/sounds/350677/
+
+tires.mp3 — "Tires Squeaking.aif" by RutgerMuller, CC0 1.0.
+https://freesound.org/people/RutgerMuller/sounds/104026/
+
+countdown.mp3 — "service bell ring" by AlaskaRobotics, CC0 1.0.
+https://freesound.org/people/AlaskaRobotics/sounds/221515/
+
+go.mp3 — "JM_TRANSPORT_EXT_Horn 01a - Car_Short_Mini Countryman.wav" by Julien_Matthey, CC0 1.0.
+https://freesound.org/people/Julien_Matthey/sounds/436589/
+
+victory.mp3 — "Crowd Cheer" by FoolBoyMedia, CC0 1.0.
+https://freesound.org/people/FoolBoyMedia/sounds/397434/
+
+defeat.mp3 — "Bass_Drum_Hit_single.wav" by jcdecha, CC0 1.0.
+https://freesound.org/people/jcdecha/sounds/235453/
+
+The race effects are excerpts with fades, filtering and level adjustment. The defeat cue is also slowed to 88%. All effects are encoded as MP3.

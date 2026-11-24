@@ -1,5 +1,7 @@
 # Alpha 0.4 audio and animation
 
+This document describes the original Alpha 0.4 release. Alpha 0.4.1 replaces its synthesis with recorded samples. See the [case and interface sources](audio-case-sources.md) and [race sources](audio-race-sources.md).
+
 The HUD Sound panel controls the master, engine and effects channels. The game saves the three levels and the on/off preference in browser storage. The previous Race Sound preference supplies the initial on/off value for existing installs. Development retains its own preference key.
 
 ## Audio sources

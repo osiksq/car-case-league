@@ -109,28 +109,40 @@ test('race audio follows the start, pauses with the scene, and stops on Skip Rac
       }
       disconnect.call(this);
     };
-    const original = AudioContext.prototype.createOscillator;
-    const active = new Set<OscillatorNode>();
+    const read = Response.prototype.arrayBuffer;
+    const decode = AudioContext.prototype.decodeAudioData;
+    const fileByBytes = new WeakMap<ArrayBuffer, string>();
+    const fileByBuffer = new WeakMap<AudioBuffer, string>();
+    Response.prototype.arrayBuffer = async function () {
+      const bytes = await read.call(this);
+      fileByBytes.set(bytes, this.url.split('/').at(-1) ?? '');
+      return bytes;
+    };
+    AudioContext.prototype.decodeAudioData = async function (bytes) {
+      const name = fileByBytes.get(bytes);
+      const buffer = await decode.call(this, bytes);
+      if (name) fileByBuffer.set(buffer, name);
+      return buffer;
+    };
+    const original = AudioContext.prototype.createBufferSource;
+    const active = new Set<AudioBufferSourceNode>();
     function updateAudioState() {
       document.documentElement.dataset.activeSoundSources = String(active.size);
     }
-    AudioContext.prototype.createOscillator = function () {
-      const oscillator = original.call(this);
-      const start = oscillator.start.bind(oscillator);
-      oscillator.start = (...args) => {
-        active.add(oscillator);
+    AudioContext.prototype.createBufferSource = function () {
+      const source = original.call(this);
+      const start = source.start.bind(source);
+      source.start = (...args) => {
+        active.add(source);
         updateAudioState();
+        const file = source.buffer && fileByBuffer.get(source.buffer);
+        if (file === 'countdown.mp3') document.documentElement.dataset.countdownSound = 'true';
+        if (file === 'go.mp3') document.documentElement.dataset.startSound = 'true';
+        if (source.loop && file === 'engine-vintage.mp3') document.documentElement.dataset.motorSound = 'true';
         start(...args);
       };
-      oscillator.addEventListener('ended', () => { active.delete(oscillator); updateAudioState(); });
-      const frequency = oscillator.frequency;
-      const setFrequency = frequency.setValueAtTime.bind(frequency);
-      frequency.setValueAtTime = (value, time) => {
-        if (value === 330) document.documentElement.dataset.countdownSound = 'true';
-        if (value === 495) document.documentElement.dataset.startSound = 'true';
-        return setFrequency(value, time);
-      };
-      return oscillator;
+      source.addEventListener('ended', () => { active.delete(source); updateAudioState(); });
+      return source;
     };
   });
   const button = await prepareRace(page, 'endurance');
@@ -139,6 +151,7 @@ test('race audio follows the start, pauses with the scene, and stops on Skip Rac
   await expect(html).toHaveAttribute('data-countdown-sound', 'true');
   await page.clock.fastForward(4_000);
   await expect(html).toHaveAttribute('data-start-sound', 'true', { timeout: 7_000 });
+  await expect(html).toHaveAttribute('data-motor-sound', 'true');
   await expect(html).toHaveAttribute('data-active-scene-observers', '1');
   const scene = page.locator('[data-race-scene]');
   await expect(scene).toHaveAttribute('data-race-status', 'racing');

@@ -72,6 +72,16 @@ export function junkyardRemainingMs(state: GameState, now = gameClockNow()): num
   return cooldownRemainingMs(state.timing.junkyardOpenedAt, economy.junkyardCooldownMs, now);
 }
 
+export function resetGame(state: GameState, now = gameClockNow()): GameState {
+  const fresh = createGame();
+  // Resetting inventory cannot renew a free opening that is still cooling down.
+  if (junkyardRemainingMs(state, now) > 0) {
+    fresh.timing.lastSeenAt = state.timing.lastSeenAt;
+    fresh.timing.junkyardOpenedAt = state.timing.junkyardOpenedAt;
+  }
+  return fresh;
+}
+
 export function openCase(state: GameState, id: CaseId = 'junkyard', seed?: number, now = gameClockNow(), unlimited = false): GameState {
   requireIdle(state);
   const remainingMs = junkyardRemainingMs(state, now);

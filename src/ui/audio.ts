@@ -32,74 +32,82 @@ export function normalizeAudioSettings(value: unknown): AudioSettings {
   };
 }
 
-type SoundName = 'button' | 'case-select' | 'case-open' | 'car-select' | 'coins' | 'sale' | 'league' | 'victory' | 'defeat';
+type SoundName = 'button' | 'case-select' | 'car-select' | 'coins' | 'sale' | 'league' | 'victory' | 'defeat';
 type RaceOutcome = { outcome: 'victory' | 'defeat'; coins?: boolean; league?: boolean };
 type UiCue = SoundName | { reward: Rarity } | RaceOutcome;
-type Note = readonly [frequency: number, duration: number, gain: number, at?: number, endFrequency?: number, wave?: OscillatorType];
+type Sample = readonly [file: string, level: number];
 
-const effects: Record<SoundName, readonly Note[]> = {
-  button: [[520, .052, .12, 0, 380, 'triangle']],
-  'case-select': [[370, .09, .13, 0, 580, 'triangle'], [740, .08, .08, .042]],
-  'case-open': [[82, .18, .17, 0, 39, 'triangle'], [235, .09, .08, .045, 118]],
-  'car-select': [[392, .09, .13, 0, 480, 'triangle'], [650, .11, .07, .058]],
-  coins: [[932, .115, .09], [1245, .124, .10, .09]],
-  sale: [[245, .098, .10, 0, 172, 'triangle'], [830, .13, .12, .06], [1108, .15, .09, .12]],
-  league: [[330, .21, .13, 0, 330, 'triangle'], [495, .21, .14, .11], [660, .28, .11, .22], [990, .38, .085, .33]],
-  victory: [[392, .17, .14, 0, 440, 'triangle'], [523, .22, .13, .12], [659, .29, .15, .23], [1047, .27, .065, .27]],
-  defeat: [[330, .23, .13, 0, 310, 'triangle'], [247, .30, .13, .12, 218], [147, .29, .08, .23]],
+const effectsBank: Record<SoundName, Sample> = {
+  button: ['ui-button', .48],
+  'case-select': ['case-select', .63],
+  'car-select': ['ui-car-select', .61],
+  coins: ['ui-coins', .73],
+  sale: ['ui-sale', .78],
+  league: ['ui-league', .83],
+  victory: ['victory', .83],
+  defeat: ['defeat', .70],
 };
-
-const rewardEffects: Record<Rarity, readonly Note[]> = {
-  Common: [[420, .14, .16, 0, 520, 'triangle']],
-  Uncommon: [[392, .13, .16, 0, 440, 'triangle'], [659, .19, .10, .09]],
-  Rare: [[294, .17, .15, 0, 330, 'triangle'], [440, .18, .11, .085], [587, .25, .12, .18]],
-  Epic: [[165, .28, .18, 0, 124, 'triangle'], [330, .21, .12, .10], [494, .21, .12, .19], [740, .37, .12, .27]],
-  Legendary: [[110, .40, .19, 0, 69, 'triangle'], [330, .28, .12, .075], [440, .30, .13, .17], [660, .38, .13, .25], [880, .44, .075, .31]],
-  Mythic: [[82, .55, .22, 0, 49, 'triangle'], [220, .35, .12, .095, 440, 'triangle'], [523, .36, .12, .20],
-    [784, .37, .13, .31], [1175, .48, .11, .41], [1568, .46, .07, .50]],
+const rewards: Record<Rarity, Sample> = {
+  Common: ['reward-common', .70],
+  Uncommon: ['reward-uncommon', .72],
+  Rare: ['reward-rare', .75],
+  Epic: ['reward-epic', .78],
+  Legendary: ['reward-legendary', .91],
+  Mythic: ['reward-mythic', .95],
 };
-const promotionTail: readonly Note[] = [[660, .25, .13], [990, .35, .09, .15]];
+const raceSamples = {
+  countdown: ['countdown', .60],
+  go: ['go', .82],
+  ignition: ['ignition', .50],
+  shift: ['shift', .63],
+  pass: ['pass', .71],
+  tires: ['tires', .50],
+  finish: ['finish', .79],
+} satisfies Record<string, Sample>;
+const caseSamples = {
+  open: ['case-open', .73],
+  latch: ['case-latch', .69],
+  tick: ['reel-tick', .51],
+  settle: ['reel-stop', .86],
+} satisfies Record<string, Sample>;
 
 interface AudioGraph {
   context: AudioContext;
   master: GainNode;
   engine: GainNode;
   effects: GainNode;
-  noise?: AudioBuffer;
+  samples: Map<string, AudioBuffer | Promise<AudioBuffer | null> | null>;
 }
 
-interface Voice {
-  scope: symbol;
-  stop(): void;
-}
-
+interface Scope { active: boolean }
+interface Voice { scope: Scope; stop(): void }
 interface Motor {
-  scope: symbol;
+  scope: Scope;
   update(pace: number): void;
   shift(): void;
-  stop(): void;
+  stop(finish?: boolean): void;
 }
 
-const vintage = { base: 29, climb: 57, filter: 115, brightness: 465, harmonic: 2, level: .19 };
-const sport = { base: 41, climb: 82, filter: 162, brightness: 700, harmonic: 2, level: .15 };
-const hyper = { base: 49, climb: 106, filter: 205, brightness: 900, harmonic: 3, level: .13 };
-
 function engineProfile(car: Car) {
-  if (car.rarity === 'Mythic' || car.class === 'Exotic') return hyper;
-  if (car.rarity === 'Common' || car.class === 'Classic' || car.class === 'Collector') return vintage;
-  return sport;
+  if (car.rarity === 'Mythic' || car.class === 'Exotic') return { file: 'engine-hyper', base: .77, range: .67, gain: .75 };
+  if (car.rarity === 'Common' || car.class === 'Classic' || car.class === 'Collector') {
+    return { file: 'engine-vintage', base: .81, range: .49, gain: .81 };
+  }
+  return { file: 'engine-sport', base: .78, range: .60, gain: .78 };
 }
 
 class GameAudio {
   private settings = normalizeAudioSettings(defaultAudioSettings);
   private graph: AudioGraph | undefined;
   private readonly voices = new Set<Voice>();
-  private readonly lastPlayed = new Map<string, number>();
-  private readonly uiScope = Symbol('interface');
-  private readonly voiceLimit = globalThis.matchMedia?.('(pointer: coarse)').matches ? 8 : 13;
+  private readonly lastPlayed = new Map<SoundName, number>();
+  private readonly uiScope: Scope = { active: true };
+  private readonly voiceLimit = globalThis.matchMedia?.('(pointer: coarse)').matches ? 8 : 12;
   private motor: Motor | undefined;
   private visible = typeof document === 'undefined' || !document.hidden;
   private resuming: Promise<void> | undefined;
+  private effectsGeneration = 0;
+  private engineGeneration = 0;
 
   configure(settings: AudioSettings): void {
     this.settings = normalizeAudioSettings(settings);
@@ -108,8 +116,14 @@ class GameAudio {
       this.stopAll();
       return;
     }
-    if (this.settings.engine === 0) this.stopMotor();
-    if (this.settings.effects === 0) this.stopVoices();
+    if (this.settings.engine === 0) {
+      this.engineGeneration++;
+      this.stopMotor();
+    }
+    if (this.settings.effects === 0) {
+      this.effectsGeneration++;
+      this.stopVoices();
+    }
   }
 
   unlock(): void {
@@ -125,7 +139,7 @@ class GameAudio {
           const engine = context.createGain();
           const effects = context.createGain();
           const limiter = context.createDynamicsCompressor();
-          limiter.threshold.value = -15;
+          limiter.threshold.value = -13;
           limiter.ratio.value = 4;
           limiter.attack.value = .008;
           limiter.release.value = .18;
@@ -133,14 +147,14 @@ class GameAudio {
           effects.connect(master);
           master.connect(limiter);
           limiter.connect(context.destination);
-          this.graph = { context, master, engine, effects };
+          this.graph = { context, master, engine, effects, samples: new Map() };
           this.updateMixer();
+          this.warm([effectsBank.button, effectsBank['case-select'], raceSamples.countdown, raceSamples.go]);
         } catch {
           void context.close().catch(() => {});
           return;
         }
       } catch {
-        // The game remains usable when audio creation is blocked or unsupported.
         return;
       }
     }
@@ -164,69 +178,116 @@ class GameAudio {
     }
   }
 
+  private load(graph: AudioGraph, file: string): AudioBuffer | Promise<AudioBuffer | null> | null {
+    if (!graph.samples.has(file)) {
+      const pending = fetch(`${import.meta.env.BASE_URL}audio/${file}.mp3`)
+        .then((response) => {
+          if (!response.ok) throw new Error('Audio sample unavailable');
+          return response.arrayBuffer();
+        })
+        .then((bytes) => graph.context.decodeAudioData(bytes))
+        .catch(() => null)
+        .then((buffer) => {
+          graph.samples.set(file, buffer);
+          return buffer;
+        });
+      graph.samples.set(file, pending);
+      return pending;
+    }
+    return graph.samples.get(file) ?? null;
+  }
+
+  private warm(samples: readonly Sample[]): void {
+    const graph = this.graph;
+    if (!graph || !this.settings.enabled) return;
+    for (const [file] of samples) this.load(graph, file);
+  }
+
   play(cue: UiCue): void {
     const graph = this.activeGraph();
     if (!graph || this.settings.effects === 0) return;
     if (typeof cue === 'string') {
-      if (!this.allow(cue, graph.context.currentTime, .08)) return;
-      this.notes(graph, this.uiScope, effects[cue]);
+      const now = graph.context.currentTime;
+      if (now - (this.lastPlayed.get(cue) ?? -Infinity) < .08) return;
+      this.lastPlayed.set(cue, now);
+      this.sample(this.uiScope, effectsBank[cue]);
+      if (cue === 'case-select') this.warm(Object.values(caseSamples));
     } else if ('reward' in cue) {
-      this.notes(graph, this.uiScope, rewardEffects[cue.reward]);
+      this.sample(this.uiScope, rewards[cue.reward]);
     } else {
-      this.notes(graph, this.uiScope, effects[cue.outcome]);
-      if (cue.coins) this.notes(graph, this.uiScope, effects.coins, .48);
-      if (cue.league) this.notes(graph, this.uiScope, cue.coins ? promotionTail : effects.league, cue.coins ? .73 : .50);
+      this.sample(this.uiScope, effectsBank[cue.outcome]);
+      if (cue.coins) this.sample(this.uiScope, effectsBank.coins, .47);
+      if (cue.league) this.sample(this.uiScope, effectsBank.league, cue.coins ? .78 : .50);
     }
   }
 
   race(car: Car): { cue(event: RaceCue): void; stop(): void } {
-    const scope = Symbol('race');
+    const scope: Scope = { active: true };
+    const profile = engineProfile(car);
     let driving = false;
-    let stopped = false;
+    let loading = false;
+    let pace = 0;
+    this.warm([...Object.values(raceSamples), effectsBank.victory, effectsBank.defeat, effectsBank.coins, effectsBank.league, [profile.file, 1]]);
+
+    const runMotor = () => {
+      const graph = this.activeGraph();
+      if (!graph || !driving || !scope.active || this.settings.engine === 0 || loading) return;
+      if (this.motor?.scope === scope) {
+        this.motor.update(pace);
+        return;
+      }
+      const buffer = this.load(graph, profile.file);
+      if (!buffer) return;
+      const generation = this.engineGeneration;
+      if (buffer instanceof Promise) {
+        loading = true;
+        void buffer.then((loaded) => {
+          loading = false;
+          if (loaded && generation === this.engineGeneration && scope.active && driving
+            && this.activeGraph() === graph && this.settings.engine > 0) {
+            this.startMotor(graph, scope, profile, loaded).update(pace);
+          }
+        });
+      } else {
+        this.startMotor(graph, scope, profile, buffer).update(pace);
+      }
+    };
+
     return {
       cue: (event) => {
-        if (stopped) return;
-        if (event.type === 'start') driving = true;
-        if (event.type === 'finish') {
-          driving = false;
-          if (this.motor?.scope === scope) this.stopMotor();
-        }
-        const graph = this.activeGraph();
-        if (!graph) return;
-        const hasEffects = this.settings.effects > 0;
+        if (!scope.active) return;
         switch (event.type) {
           case 'countdown':
-            if (hasEffects) this.notes(graph, scope, [[330, .15, .24]]);
+            this.sample(scope, raceSamples.countdown);
             break;
           case 'start':
-            if (hasEffects) this.notes(graph, scope, [[495, .23, .29, 0, 660]]);
-            if (this.settings.engine > 0) this.startMotor(graph, car, scope).update(.22);
+            driving = true;
+            pace = .20;
+            this.sample(scope, raceSamples.go);
+            this.sample(scope, raceSamples.ignition, .035);
+            runMotor();
             break;
           case 'engine':
-            if (!driving || this.settings.engine === 0) break;
-            if (this.motor?.scope !== scope) this.startMotor(graph, car, scope);
-            this.motor?.update(event.pace);
+            pace = event.pace;
+            runMotor();
             break;
           case 'shift':
             if (this.motor?.scope === scope) this.motor.shift();
-            if (hasEffects) {
-              this.notes(graph, scope, [[160, .12, .13, 0, 66, 'triangle']]);
-              this.hiss(graph, scope, .11, .14, 760, 150);
-            }
+            this.sample(scope, raceSamples.shift);
             break;
           case 'overtake':
-            if (hasEffects) {
-              this.notes(graph, scope, [[270, .25, .12, 0, 90, 'triangle']]);
-              this.hiss(graph, scope, .23, .22, 1420, 290);
-            }
+            this.sample(scope, raceSamples.pass);
+            this.sample(scope, raceSamples.tires, .02);
             break;
           case 'finish':
-            if (hasEffects) this.notes(graph, scope, [[392, .15, .15], [523, .26, .17, .12]]);
+            driving = false;
+            if (this.motor?.scope === scope) this.stopMotor(true);
+            this.sample(scope, raceSamples.finish);
             break;
         }
       },
       stop: () => {
-        stopped = true;
+        scope.active = false;
         this.stopVoices(scope);
         if (this.motor?.scope === scope) this.stopMotor();
       },
@@ -234,35 +295,24 @@ class GameAudio {
   }
 
   reel(): { cue(event: ReelCue): void; stop(): void } {
-    const scope = Symbol('roulette');
+    const scope: Scope = { active: true };
     let lastTick = -Infinity;
-    let stopped = false;
-    const graph = this.activeGraph();
-    if (graph && this.settings.effects > 0) this.notes(graph, scope, effects['case-open']);
+    this.warm([...Object.values(caseSamples), ...Object.values(rewards)]);
+    this.sample(scope, caseSamples.open);
     return {
       cue: (event) => {
-        const graph = this.activeGraph();
-        if (stopped || !graph || this.settings.effects === 0) return;
-        switch (event) {
-          case 'mechanism':
-            this.notes(graph, scope, [[150, .135, .19, 0, 80, 'triangle'], [720, .08, .095, .04, 260]]);
-            this.hiss(graph, scope, .21, .18, 490, 130);
-            break;
-          case 'tick': {
-            const now = graph.context.currentTime;
-            if (now - lastTick < .060) break;
-            lastTick = now;
-            this.notes(graph, scope, [[610, .058, .085, 0, 320, 'triangle']]);
-            break;
-          }
-          case 'settle':
-            this.notes(graph, scope, [[138, .156, .24, 0, 59, 'triangle'], [820, .085, .13, .025, 300]]);
-            this.hiss(graph, scope, .095, .14, 520, 180);
-            break;
+        if (!scope.active) return;
+        if (event === 'mechanism') this.sample(scope, caseSamples.latch, .07);
+        if (event === 'settle') this.sample(scope, caseSamples.settle);
+        if (event === 'tick') {
+          const now = this.activeGraph()?.context.currentTime;
+          if (now === undefined || now - lastTick < .061) return;
+          lastTick = now;
+          this.sample(scope, caseSamples.tick, 0, .10);
         }
       },
       stop: () => {
-        stopped = true;
+        scope.active = false;
         this.stopVoices(scope);
       },
     };
@@ -297,147 +347,108 @@ class GameAudio {
     }
   }
 
-  private allow(cue: string, now: number, gap: number): boolean {
-    if (now - (this.lastPlayed.get(cue) ?? -Infinity) < gap) return false;
-    this.lastPlayed.set(cue, now);
-    return true;
-  }
-
-  private limitVoices(): void {
-    if (this.voices.size >= this.voiceLimit) this.voices.values().next().value?.stop();
-  }
-
-  private schedule(
-    graph: AudioGraph, scope: symbol, source: AudioScheduledSourceNode, nodes: AudioNode[], at: number, duration: number,
-  ): void {
-    const cleanup = () => {
-      source.disconnect();
-      for (const node of nodes) node.disconnect();
-      this.voices.delete(voice);
-    };
-    const voice: Voice = { scope, stop: () => {
-      source.onended = null;
-      source.stop();
-      cleanup();
-    } };
-    source.onended = cleanup;
-    this.limitVoices();
-    this.voices.add(voice);
-    source.start(graph.context.currentTime + at);
-    source.stop(graph.context.currentTime + at + duration);
-  }
-
-  private notes(graph: AudioGraph, scope: symbol, notes: readonly Note[], delay = 0): void {
-    for (const [frequency, duration, level, offset = 0, end = frequency, wave = 'sine'] of notes) {
+  private sample(scope: Scope, [file, level]: Sample, delay = 0, tolerance = .28): void {
+    const graph = this.activeGraph();
+    if (!graph || !scope.active || this.settings.effects === 0) return;
+    const generation = this.effectsGeneration;
+    const when = graph.context.currentTime + delay;
+    const resource = this.load(graph, file);
+    const play = (buffer: AudioBuffer | null) => {
+      if (!buffer || !scope.active || this.activeGraph() !== graph || generation !== this.effectsGeneration) return;
       const { context, effects } = graph;
-      const at = offset + delay;
-      const time = context.currentTime + at;
-      const oscillator = context.createOscillator();
-      const envelope = context.createGain();
-      oscillator.type = wave;
-      oscillator.frequency.setValueAtTime(frequency, time);
-      oscillator.frequency.exponentialRampToValueAtTime(end, time + duration);
-      envelope.gain.value = .001;
-      envelope.gain.setValueAtTime(.001, time);
-      envelope.gain.exponentialRampToValueAtTime(level, time + .013);
-      envelope.gain.exponentialRampToValueAtTime(.001, time + duration);
-      oscillator.connect(envelope);
-      envelope.connect(effects);
-      this.schedule(graph, scope, oscillator, [envelope], at, duration);
-    }
+      if (context.currentTime - when > tolerance) return;
+      const source = context.createBufferSource();
+      const gain = context.createGain();
+      source.buffer = buffer;
+      gain.gain.value = level;
+      source.connect(gain);
+      gain.connect(effects);
+      const cleanup = () => {
+        source.disconnect();
+        gain.disconnect();
+        this.voices.delete(voice);
+      };
+      const voice: Voice = { scope, stop: () => {
+        source.onended = null;
+        source.stop();
+        cleanup();
+      } };
+      source.onended = cleanup;
+      if (this.voices.size >= this.voiceLimit) this.voices.values().next().value?.stop();
+      this.voices.add(voice);
+      source.start(Math.max(when, context.currentTime));
+    };
+    if (resource instanceof Promise) void resource.then(play);
+    else play(resource);
   }
 
-  private hiss(graph: AudioGraph, scope: symbol, duration: number, level: number, from: number, to: number): void {
-    const { context, effects } = graph;
-    const time = context.currentTime;
-    if (!graph.noise) {
-      graph.noise = context.createBuffer(1, Math.ceil(context.sampleRate * .32), context.sampleRate);
-      const samples = graph.noise.getChannelData(0);
-      // Fixed seed gives a consistent original noise bed on every device.
-      let seed = 0x28ff6e7;
-      for (let i = 0; i < samples.length; i++) {
-        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-        samples[i] = seed / 0x80000000 - 1;
-      }
-    }
-    const source = context.createBufferSource();
-    source.buffer = graph.noise;
-    const filter = context.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.Q.value = .75;
-    filter.frequency.setValueAtTime(from, time);
-    filter.frequency.exponentialRampToValueAtTime(to, time + duration);
-    const envelope = context.createGain();
-    envelope.gain.value = .001;
-    envelope.gain.setValueAtTime(.001, time);
-    envelope.gain.exponentialRampToValueAtTime(level, time + .012);
-    envelope.gain.exponentialRampToValueAtTime(.001, time + duration);
-    source.connect(filter);
-    filter.connect(envelope);
-    envelope.connect(effects);
-    this.schedule(graph, scope, source, [filter, envelope], 0, duration);
-  }
-
-  private startMotor(graph: AudioGraph, car: Car, scope: symbol): Motor {
+  private startMotor(graph: AudioGraph, scope: Scope, profile: ReturnType<typeof engineProfile>, buffer: AudioBuffer): Motor {
     this.stopMotor();
     const { context, engine } = graph;
-    const profile = engineProfile(car);
-    const base = context.createOscillator();
-    base.type = 'sawtooth';
-    base.frequency.value = profile.base;
-    const harmonic = context.createOscillator();
-    harmonic.type = car.class === 'Muscle' ? 'sine' : 'triangle';
-    harmonic.frequency.value = profile.base * profile.harmonic;
-    const filter = context.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = profile.filter;
-    const envelope = context.createGain();
-    envelope.gain.value = 0;
-    base.connect(filter);
-    harmonic.connect(filter);
-    filter.connect(envelope);
-    envelope.connect(engine);
-    base.start();
-    harmonic.start();
-    let shiftedAt = -Infinity;
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    source.playbackRate.value = profile.base;
+    const lowpass = context.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    lowpass.frequency.value = 1800;
+    const gain = context.createGain();
+    gain.gain.value = 0;
+    source.connect(lowpass);
+    lowpass.connect(gain);
+    gain.connect(engine);
+    source.start();
+    const cleanup = () => {
+      source.disconnect();
+      lowpass.disconnect();
+      gain.disconnect();
+      if (this.motor?.scope === scope) this.motor = undefined;
+    };
+    let shiftTime = -Infinity;
+    let fading = false;
     const motor: Motor = {
       scope,
-      shift: () => { shiftedAt = context.currentTime; },
+      shift: () => { shiftTime = context.currentTime; },
       update: (pace) => {
         const now = context.currentTime;
         const throttle = Math.max(0, Math.min(1, pace));
-        const dip = Math.max(0, 1 - (now - shiftedAt) / .19);
-        const pitch = profile.base + throttle * profile.climb - 18 * dip;
-        base.frequency.setTargetAtTime(pitch, now, .058);
-        harmonic.frequency.setTargetAtTime(pitch * profile.harmonic, now, .064);
-        filter.frequency.setTargetAtTime(profile.filter + profile.brightness * throttle, now, .075);
-        envelope.gain.setTargetAtTime(profile.level * (.42 + throttle * .55 - .24 * dip), now, .057);
+        const dip = Math.max(0, 1 - (now - shiftTime) / .25);
+        source.playbackRate.setTargetAtTime(profile.base + throttle * profile.range - .19 * dip, now, .065);
+        lowpass.frequency.setTargetAtTime(1250 + throttle * 5000, now, .10);
+        gain.gain.setTargetAtTime(profile.gain * (.47 + throttle * .53 - .22 * dip), now, .08);
       },
-      stop: () => {
-        base.stop();
-        harmonic.stop();
-        base.disconnect();
-        harmonic.disconnect();
-        filter.disconnect();
-        envelope.disconnect();
+      stop: (finish) => {
+        if (finish && !fading) {
+          fading = true;
+          const now = context.currentTime;
+          gain.gain.setTargetAtTime(0, now, .075);
+          source.onended = cleanup;
+          source.stop(now + .34);
+        } else {
+          source.onended = null;
+          source.stop();
+          cleanup();
+        }
       },
     };
     this.motor = motor;
     return motor;
   }
 
-  private stopMotor(): void {
-    this.motor?.stop();
-    this.motor = undefined;
+  private stopMotor(finish = false): void {
+    this.motor?.stop(finish);
+    if (!finish) this.motor = undefined;
   }
 
-  private stopVoices(scope?: symbol): void {
+  private stopVoices(scope?: Scope): void {
     for (const voice of this.voices) {
-      if (scope === undefined || voice.scope === scope) voice.stop();
+      if (!scope || voice.scope === scope) voice.stop();
     }
   }
 
   private stopAll(): void {
+    this.engineGeneration++;
+    this.effectsGeneration++;
     this.stopMotor();
     this.stopVoices();
   }

@@ -47,6 +47,7 @@ dialog.sound-panel {
 }
 .sound-channel output { color: var(--muted); font-variant-numeric: tabular-nums; }
 .sound-channel input { grid-column: 1 / -1; width: 100%; min-height: 28px; accent-color: var(--lime); }
+.sound-credits { display: inline-block; margin-top: .65rem; color: var(--muted); font-size: .78rem; }
 
 @supports (transition-behavior: allow-discrete) {
   dialog.sound-panel {
