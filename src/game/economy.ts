@@ -14,7 +14,10 @@ export const economy = {
   } satisfies Record<LeagueId, { firstWin: number; replayWin: number }>,
 };
 
-export const gameClockStartedAt = Math.floor(performance.timeOrigin);
+const timeOrigin = performance.timeOrigin;
+export const gameClockStartedAt = Math.floor(Number.isFinite(timeOrigin) && timeOrigin > 0
+  ? timeOrigin
+  : Date.now() - performance.now());
 
 export function gameClockNow(): number {
   return gameClockStartedAt + Math.floor(performance.now());

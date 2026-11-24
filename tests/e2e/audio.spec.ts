@@ -106,10 +106,10 @@ test('blocking Web Audio does not interrupt case awards or result recovery', asy
 test('a hidden tab pauses the roulette and stays quiet until foreground playback resumes', async ({ page }) => {
   await page.clock.install();
   await page.addInitScript(() => {
-    const start = AudioScheduledSourceNode.prototype.start;
+    const start = AudioBufferSourceNode.prototype.start;
     let sources = 0;
-    const active = new Set<AudioScheduledSourceNode>();
-    AudioScheduledSourceNode.prototype.start = function (...args) {
+    const active = new Set<AudioBufferSourceNode>();
+    AudioBufferSourceNode.prototype.start = function (...args) {
       document.documentElement.dataset.startedAudioSources = String(++sources);
       active.add(this);
       document.documentElement.dataset.activeAudioSources = String(active.size);

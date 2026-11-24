@@ -41,7 +41,8 @@ export function createSoundPanel(onChange: (settings: AudioSettings, trusted: bo
   ${controls.map(([key, label]) => `<div class="sound-channel">
     <label for="sound-${key}">${label}</label><output for="sound-${key}" aria-hidden="true"></output>
     <input id="sound-${key}" type="range" min="0" max="100" step="1">
-  </div>`).join('')}`;
+  </div>`).join('')}
+  <a class="sound-credits" href="${import.meta.env.BASE_URL}audio/credits.html" target="_blank" rel="noopener noreferrer">Audio credits</a>`;
   const toggle = panel.querySelector<HTMLButtonElement>('.sound-toggle')!;
   const status = panel.querySelector<HTMLElement>('[data-sound-status]')!;
   let settings: AudioSettings;
