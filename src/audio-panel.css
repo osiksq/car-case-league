@@ -1,0 +1,68 @@
+.header-actions .sound-button[data-audible='false'] { color: var(--muted); }
+.header-actions .sound-button[aria-expanded='true'] { color: var(--lime); border-color: #637153; }
+
+dialog.sound-panel {
+  position: fixed;
+  inset: 4.75rem max(1rem, calc((100vw - 1440px) / 2 + 1rem)) auto auto;
+  width: min(20rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 6rem);
+  margin: 0;
+  padding: .9rem;
+  overflow: auto;
+  background: #171d23;
+}
+
+.sound-panel::backdrop { background: #070a0e66; backdrop-filter: none; }
+.sound-panel-heading, .sound-panel-heading h2, .sound-toggle {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+}
+.sound-panel-heading { justify-content: space-between; margin-bottom: .7rem; }
+.sound-panel-heading h2 { font-size: 1.12rem; }
+.sound-panel-heading h2 svg { width: 1.25rem; color: var(--lime); }
+.sound-panel .button { min-height: 36px; padding: .35rem .65rem; font-size: .78rem; }
+
+.sound-toggle {
+  width: 100%;
+  min-height: 42px;
+  justify-content: space-between;
+  padding: .45rem .65rem;
+  border: 1px solid var(--border);
+  border-radius: .45rem;
+  color: #edf1f5;
+  background: #20272e;
+  font-weight: 700;
+}
+.sound-toggle strong { color: var(--muted); }
+.sound-toggle[aria-checked='true'] strong { color: var(--lime); }
+
+.sound-channel {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  margin-top: .75rem;
+  color: #e2e9f0;
+  font-size: .85rem;
+}
+.sound-channel output { color: var(--muted); font-variant-numeric: tabular-nums; }
+.sound-channel input { grid-column: 1 / -1; width: 100%; min-height: 28px; accent-color: var(--lime); }
+
+@supports (transition-behavior: allow-discrete) {
+  dialog.sound-panel {
+    opacity: 0;
+    transform: translateY(-5px) scale(.99);
+    transition: opacity .15s ease, transform .15s ease, display .15s allow-discrete, overlay .15s allow-discrete;
+  }
+  dialog.sound-panel[open] { opacity: 1; transform: none; }
+  @starting-style {
+    dialog.sound-panel[open] { opacity: 0; transform: translateY(-5px) scale(.99); }
+  }
+  .reduced-motion dialog.sound-panel { transition: none; }
+}
+
+@media (max-width: 475px) {
+  dialog.sound-panel { inset-block-start: 6.6rem; max-height: calc(100dvh - 8rem); }
+  .game-hud .header-actions { gap: .28rem; }
+  .game-hud .header-actions .settings-button { width: 35px; min-width: 0; }
+}

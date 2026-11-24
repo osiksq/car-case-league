@@ -13,6 +13,8 @@ const iconPaths = {
   check: '<path d="m5 12 4 4L19 6"/>',
   bolt: '<path d="m13 2-8 12h7l-1 8 8-12h-7l1-8Z"/>',
   crest: '<path d="m3 7 4 3 5-6 5 6 4-3-2 11H5L3 7Zm3 8h12"/>',
+  audio: '<path d="M3 9v6h4l5 4V5L7 9H3Zm12 1a3 3 0 0 1 0 4m2-7a7 7 0 0 1 0 10"/>',
+  mute: '<path d="M3 9v6h4l5 4V5L7 9H3Zm12 1 5 5m0-5-5 5"/>',
 };
 
 const statNames: Record<Stat, string> = {

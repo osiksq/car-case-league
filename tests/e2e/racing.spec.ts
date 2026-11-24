@@ -90,7 +90,8 @@ for (const [eventId, won] of [['circuit', true], ['wet-circuit', false]] as cons
   });
 }
 
-test('audio follows the countdown and start, stops on Skip Race, and remembers mute', async ({ page }) => {
+test('race audio follows the start, pauses with the scene, and stops on Skip Race', async ({ page }) => {
+  await page.clock.install();
   await page.addInitScript(() => {
     const observe = ResizeObserver.prototype.observe;
     const disconnect = ResizeObserver.prototype.disconnect;
@@ -136,22 +137,43 @@ test('audio follows the countdown and start, stops on Skip Race, and remembers m
   await button('Start Race').click();
   const html = page.locator('html');
   await expect(html).toHaveAttribute('data-countdown-sound', 'true');
+  await page.clock.fastForward(4_000);
   await expect(html).toHaveAttribute('data-start-sound', 'true', { timeout: 7_000 });
   await expect(html).toHaveAttribute('data-active-scene-observers', '1');
+  const scene = page.locator('[data-race-scene]');
+  await expect(scene).toHaveAttribute('data-race-status', 'racing');
+  const setHidden = (hidden: boolean) => page.evaluate((hidden) => {
+    Object.defineProperty(document, 'hidden', { configurable: true, value: hidden });
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true, value: hidden ? 'hidden' : 'visible',
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }, hidden);
+  await setHidden(true);
+  const frozenProgress = await scene.getAttribute('data-player-progress');
+  await page.clock.fastForward(25_000);
+  await expect(scene).toHaveAttribute('data-player-progress', frozenProgress!);
+  await setHidden(false);
+  await page.clock.fastForward(350);
+  await expect(scene).not.toHaveAttribute('data-player-progress', frozenProgress!);
   const saved = await savedState(page);
   await button('Skip Race').click();
   await expect(html).toHaveAttribute('data-active-sound-sources', '0');
   await expect(html).toHaveAttribute('data-active-scene-observers', '0');
   await expect(page.getByRole('heading', { name: saved.pendingRace.won ? 'Victory' : 'Defeat', exact: true })).toBeVisible();
   expect(await savedState(page)).toEqual(saved);
-  await button('Settings').click();
-  await page.getByRole('checkbox', { name: 'Race Sound' }).uncheck();
+  await button('Sound').click();
+  const panel = page.getByRole('dialog', { name: 'Sound', exact: true });
+  const sound = panel.getByRole('switch', { name: 'Sound', exact: true });
+  await sound.click();
   await page.reload();
-  await button('Settings').click();
-  await expect(page.getByRole('checkbox', { name: 'Race Sound' })).not.toBeChecked();
-  await button('Close').click();
+  await button('Sound').click();
+  await expect(sound).toHaveAttribute('aria-checked', 'false');
+  await panel.getByRole('button', { name: 'Close', exact: true }).click();
   await button('Race Again').click();
   await button('Start Race').click();
+  await expect(page.locator('[data-race-scene]')).toHaveAttribute('data-race-status', 'countdown');
+  await page.clock.fastForward(4_000);
   await expect(page.locator('[data-race-scene]')).toHaveAttribute('data-race-status', 'racing', { timeout: 7_000 });
   await expect(html).not.toHaveAttribute('data-countdown-sound', 'true');
   await expect(html).not.toHaveAttribute('data-start-sound', 'true');
