@@ -9,10 +9,36 @@ Coin on coins_01.wav by deleted_user_2104797 and coins - in cloth 03.wav by Anth
 https://freesound.org/people/deleted_user_2104797/sounds/349277/
 https://freesound.org/people/Anthousai/sounds/336573/
 
-Cinematic boom.wav by juskiddink, CC BY 4.0, adapted in the Legendary and Mythic reward cues.
+Cinematic boom.wav by juskiddink, CC BY 4.0, adapted in the Epic and Legendary reward cues.
 https://freesound.org/people/juskiddink/sounds/130890/
 Deepest Boom Yet by hykenfreak, CC BY 4.0, adapted in the Mythic reward cue.
 https://freesound.org/people/hykenfreak/sounds/248150/
+Fabric Swish by harrietniamh, CC BY 4.0, adapted in the case opening and Exotic reward cues.
+https://freesound.org/people/harrietniamh/sounds/400351/
 https://creativecommons.org/licenses/by/4.0/
 
-The sources were trimmed, filtered, mixed where indicated, level-adjusted, and re-encoded as MP3.
+Additional case sources, CC0 1.0:
+Foley_Clothes_Jacket_Whoosh_Sequence_Stereo.wav by Nox_Sound
+https://freesound.org/people/Nox_Sound/sounds/495390/
+Short vibraphone melody by xkeril
+https://freesound.org/people/xkeril/sounds/753345/
+Vibraphone Chord by jack_urbanski
+https://freesound.org/people/jack_urbanski/sounds/495674/
+wine glass clink by fleurescence
+https://freesound.org/people/fleurescence/sounds/573160/
+Magic Wand Glitter by qubodup, incorporating recordings by urupin and vrodge
+https://freesound.org/people/qubodup/sounds/211624/
+https://freesound.org/people/urupin/sounds/122056/
+https://freesound.org/people/vrodge/sounds/119543/
+Timpani 11.wav by Sorinious_Genious
+https://freesound.org/people/Sorinious_Genious/sounds/573261/
+Cinematic Hit With Horns.wav by DeVern
+https://freesound.org/people/DeVern/sounds/427803/
+Braam by unfa
+https://freesound.org/people/unfa/sounds/647712/
+Reverse Cymbal Shiny by loganzsound
+https://freesound.org/people/loganzsound/sounds/774635/
+Metallic Riser.wav by HenryRichard
+https://freesound.org/people/HenryRichard/sounds/451653/
+
+The sources were trimmed, filtered, layered, panned, faded, and level-adjusted. Some layers were repitched or reversed. The resulting files were encoded as MP3.

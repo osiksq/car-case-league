@@ -28,7 +28,7 @@ test('infinite money grants cars without debiting the isolated wallet', async ({
   await page.getByRole('button', { name: 'Junkyard Case', exact: true }).click();
   await openCase(page, true);
   await page.getByRole('button', { name: 'Keep', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Open Free Case', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Open Free Case', exact: true })).toBeEnabled();
 
   await developer.click();
   await expect(toggle).toHaveAttribute('aria-checked', 'false');
@@ -81,31 +81,33 @@ test('test credits use normal prices and reset requires confirmation', async ({ 
   await reset.click();
   await expect(wallet).toHaveText('60');
   await page.getByRole('button', { name: 'Junkyard Case', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Open Free Case', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Open Free Case', exact: true })).toBeEnabled();
 });
 
-test('only Infinite Money bypasses the development Junkyard cooldown', async ({ page }) => {
+test('the free case supports repeated openings with Infinite Money off or on', async ({ page }) => {
   await page.goto('./');
   const button = (name: string) => page.getByRole('button', { name, exact: true });
   await button('Junkyard Case').click();
   await openCase(page, true);
   await button('Keep').click();
-  const readTiming = () => page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).timing, localSaveKey);
-  const timing = await readTiming();
-  await expect(button('Open Free Case')).toBeDisabled();
+  await openCase(page, true);
+  await button('Keep').click();
+
   const toggle = page.getByRole('switch', { name: 'Infinite Money' });
   await button('DEV').click();
   await toggle.click();
   await button('Close').click();
   await openCase(page, true);
   await button('Keep').click();
-  expect((await readTiming()).junkyardOpenedAt).toBe(timing.junkyardOpenedAt);
 
   await button('DEV').click();
   await toggle.click();
   await button('Close').click();
-  await expect(button('Open Free Case')).toBeDisabled();
-  expect((await readTiming()).junkyardOpenedAt).toBe(timing.junkyardOpenedAt);
+  await openCase(page, true);
+  await button('Keep').click();
+  const save = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!), localSaveKey);
+  expect(save.progress.casesOpened).toBe(4);
+  expect(save.coins).toBe(60);
 });
 
 test('infinite money unlocks all eight cases without debiting the wallet', async ({ page }) => {

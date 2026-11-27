@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { audio, defaultAudioSettings, normalizeAudioSettings } from '../src/ui/audio';
-import { cars } from '../src/game/config';
+import { cars, rarities } from '../src/game/config';
 
 describe('audio settings', () => {
   it('normalizes saved settings per channel and ignores invalid values', () => {
@@ -36,14 +36,14 @@ describe('audio settings', () => {
       playbackRate: ReturnType<typeof param>;
       loop: boolean;
       buffer: { file: string } | null;
-      start(): void;
+      start: ReturnType<typeof vi.fn<(when?: number, offset?: number) => void>>;
       stop(time?: number): void;
     };
     const sources: TestSource[] = [];
     const makeSource = () => {
       const source: TestSource = {
         ...node(), playbackRate: param(), loop: false, buffer: null as { file: string } | null,
-        start: () => active.add(source), stop: (time?: number) => { if (time === undefined) active.delete(source); },
+        start: vi.fn(() => { active.add(source); }), stop: (time?: number) => { if (time === undefined) active.delete(source); },
       };
       sources.push(source);
       return source;
@@ -54,7 +54,7 @@ describe('audio settings', () => {
       createBufferSource: makeSource,
       createBiquadFilter: () => ({ ...node(), frequency: param() }),
       createDynamicsCompressor: () => ({ ...node(), threshold: param(), ratio: param(), attack: param(), release: param() }),
-      decodeAudioData: async (file: string) => ({ file }),
+      decodeAudioData: async (file: string) => ({ file, duration: 3.8 }),
       suspend: async () => { context.state = 'suspended'; },
       resume: async () => { context.state = 'running'; },
     };
@@ -92,8 +92,22 @@ describe('audio settings', () => {
 
       const reel = audio.reel();
       reel.cue('mechanism');
+      reel.cue({ type: 'progress', elapsed: 0 });
       for (let i = 0; i < 20; i++) reel.cue('tick');
-      await vi.waitFor(() => expect(active.size).toBe(3));
+      await vi.waitFor(() => expect(active.size).toBe(4));
+      const riser = () => sources.filter((source) => source.buffer?.file.endsWith('reel-rise.mp3'));
+      expect(riser()).toHaveLength(1);
+      reel.cue({ type: 'progress', elapsed: 500 });
+      expect(riser()).toHaveLength(1);
+      audio.setVisible(false);
+      expect(active.size).toBe(0);
+      audio.setVisible(true);
+      reel.cue({ type: 'progress', elapsed: 1600 });
+      expect(riser()).toHaveLength(2);
+      expect(riser().at(-1)?.start).toHaveBeenCalledWith(1, 1.6);
+      reel.cue('settle');
+      expect(active.has(riser().at(-1)!)).toBe(false);
+      expect([...active]).toEqual([sources.find((source) => source.buffer?.file.endsWith('reel-stop.mp3'))]);
       reel.stop();
       expect(active.size).toBe(0);
       audio.play({ reward: 'Mythic' });
@@ -103,6 +117,13 @@ describe('audio settings', () => {
       await vi.waitFor(() => expect(fetchSample.mock.calls.filter(([file]) => file.endsWith('reward-mythic.mp3'))).toHaveLength(1));
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(active.size).toBe(0);
+      for (const rarity of rarities) audio.play({ reward: rarity });
+      await vi.waitFor(() => {
+        const rewardsPlayed = [...active] as TestSource[];
+        expect(rewardsPlayed.map((source) => source.buffer?.file.split('/').at(-1))).toEqual(
+          rarities.map((rarity) => `reward-${rarity.toLowerCase()}.mp3`),
+        );
+      });
     } finally {
       audio.setVisible(false);
       vi.unstubAllGlobals();

@@ -6,7 +6,7 @@ const reelDuration = 3_800;
 const reelHold = 330;
 const reelTickInterval = 74;
 
-export type ReelCue = 'mechanism' | 'tick' | 'settle';
+export type ReelCue = 'mechanism' | 'tick' | 'settle' | { type: 'progress'; elapsed: number };
 
 export function animateRoulette(root: HTMLElement, done: () => void, onCue?: (cue: ReelCue) => void) {
   const viewport = root.querySelector<HTMLElement>('.roulette-viewport');
@@ -56,9 +56,12 @@ export function animateRoulette(root: HTMLElement, done: () => void, onCue?: (cu
     if (ratio === 1 && !settled) {
       settled = true;
       onCue?.('settle');
-    } else if (ratio < 1 && nextCrossing !== crossing && elapsed - lastTick >= reelTickInterval) {
-      onCue?.('tick');
-      lastTick = elapsed;
+    } else if (ratio < 1) {
+      onCue?.({ type: 'progress', elapsed });
+      if (nextCrossing !== crossing && elapsed - lastTick >= reelTickInterval) {
+        onCue?.('tick');
+        lastTick = elapsed;
+      }
     }
     crossing = nextCrossing;
     return elapsed >= reelDuration + reelHold;

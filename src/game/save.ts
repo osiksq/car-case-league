@@ -21,7 +21,6 @@ export interface OwnedCar {
 
 interface EconomyTiming {
   lastSeenAt: number;
-  junkyardOpenedAt: number | null;
   raceRewardedAt: number | null;
 }
 
@@ -40,7 +39,7 @@ export interface GameState {
 }
 
 function createTiming(): EconomyTiming {
-  return { lastSeenAt: 0, junkyardOpenedAt: null, raceRewardedAt: null };
+  return { lastSeenAt: 0, raceRewardedAt: null };
 }
 
 export function createGame(): GameState {
@@ -68,26 +67,8 @@ function requireOwnedCar(state: GameState, id: string | null): OwnedCar {
   return car;
 }
 
-export function junkyardRemainingMs(state: GameState, now = gameClockNow()): number {
-  return cooldownRemainingMs(state.timing.junkyardOpenedAt, economy.junkyardCooldownMs, now);
-}
-
-export function resetGame(state: GameState, now = gameClockNow()): GameState {
-  const fresh = createGame();
-  // Resetting inventory cannot renew a free opening that is still cooling down.
-  if (junkyardRemainingMs(state, now) > 0) {
-    fresh.timing.lastSeenAt = state.timing.lastSeenAt;
-    fresh.timing.junkyardOpenedAt = state.timing.junkyardOpenedAt;
-  }
-  return fresh;
-}
-
 export function openCase(state: GameState, id: CaseId = 'junkyard', seed?: number, now = gameClockNow(), unlimited = false): GameState {
   requireIdle(state);
-  const remainingMs = junkyardRemainingMs(state, now);
-  if (id === 'junkyard' && !unlimited && remainingMs > 0) {
-    throw new Error(`Junkyard is ready in ${Math.ceil(remainingMs / 1_000)}s.`);
-  }
   const price = unlimited ? 0 : casePrice(id);
   if (state.coins < price) throw new Error('You do not have enough coins for this case.');
   const casesOpened = state.progress.casesOpened + 1;
@@ -102,11 +83,7 @@ export function openCase(state: GameState, id: CaseId = 'junkyard', seed?: numbe
     garage: [...state.garage, owned],
     selectedId: state.selectedId ?? owned.id,
     progress: { ...state.progress, casesOpened },
-    timing: {
-      ...state.timing,
-      lastSeenAt,
-      junkyardOpenedAt: id === 'junkyard' && !unlimited ? lastSeenAt : state.timing.junkyardOpenedAt,
-    },
+    timing: { ...state.timing, lastSeenAt },
     pendingCase: owned.id,
     pendingCaseType: id,
   };
@@ -314,7 +291,6 @@ function recoverTiming(timing: unknown, now: number, clockStartedAt: number): Ec
     : null;
   return {
     lastSeenAt: shiftedAt,
-    junkyardOpenedAt: recoverTimestamp(timing.junkyardOpenedAt),
     raceRewardedAt: recoverTimestamp(timing.raceRewardedAt),
   };
 }

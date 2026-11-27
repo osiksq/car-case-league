@@ -2,7 +2,6 @@ import type { LeagueId } from './career';
 
 export const economy = {
   startingCoins: 60,
-  junkyardCooldownMs: 60_000,
   raceRewardCooldownMs: 60_000,
   freeRaceWin: 18,
   lossReward: 0,

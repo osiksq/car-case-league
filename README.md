@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open [localhost:5173/car-case-league/](http://localhost:5173/car-case-league/). Open the free Junkyard Case and keep the starter car. Win either Rookie League competition to afford the first paid Rookie Case. Junkyard becomes available again after 60 seconds. Progress is stored in the current browser.
+Open [localhost:5173/car-case-league/](http://localhost:5173/car-case-league/). Open the free Junkyard Case and keep the starter car. Win either Rookie League competition or sell spare Junkyard cars to save for a paid Rookie Case. Junkyard can be opened again as soon as the previous result is resolved. Progress is stored in the current browser.
 
 The development server shows **DEV** next to Settings. It can temporarily waive case costs without debiting the wallet, add test coins, or reset development progress. The switch starts off on each page load. Development uses a separate save, and the built game served by `npm run preview` uses the release save.
 
@@ -40,4 +40,4 @@ Check the run in **Actions → Publish to GitHub Pages** and open its deployment
 - [Game Design Document](GDD.md)
 - [Repository instructions](AGENTS.md)
 - [Alpha 0.3 economy simulation](docs/economy-alpha-0.3.md)
-- The forty car illustrations in `public/cars` are original, generated studio-style Alpha artwork optimized as WebP.
+- The fifty car illustrations in `public/cars` are original, generated studio-style Alpha artwork optimized as WebP.

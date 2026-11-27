@@ -123,7 +123,7 @@ test('a saved Alpha 0.2 wallet, garage and promotion migrate without a second aw
   await page.reload();
   await expect(page.getByTestId('coin-balance')).toHaveText('721');
   await button('Junkyard Case').click();
-  await expect(button('Open Free Case')).toBeDisabled();
+  await expect(button('Open Free Case')).toBeEnabled();
   const saved = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!), storageKey);
   expect(saved.version).toBe(2);
   expect(saved.career.completed).toEqual(['depot-sprint', 'foundry-loop']);

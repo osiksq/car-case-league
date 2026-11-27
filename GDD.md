@@ -1,6 +1,6 @@
 # Car Case League — Game Design Document
 
-- **Version:** 0.3 · Alpha 0.2 (Career Update)
+- **Version:** Alpha 0.4 · Collection and Case Audio Update
 - **Platform:** Desktop and mobile web
 - **Audience:** Casual browser players · English interface
 
@@ -14,7 +14,7 @@ Coins are earned in-game. The game has no coin purchases, real-money rewards, be
 
 ## 2. Vehicle catalog and garage
 
-Alpha contains 12 unique vehicles. Each model has a name, artwork, resale value, class, rarity, and four integer stats from 1 to 100: Speed, Acceleration, Handling, and Reliability. Owned copies have their own identity and lock status.
+Alpha contains 50 unique vehicles. Each model has a name, artwork, resale value, class, rarity, and four integer stats from 1 to 100: Speed, Acceleration, Handling, and Reliability. Owned copies have their own identity and lock status.
 
 | Rarity | Color |
 |---|---|
@@ -24,32 +24,30 @@ Alpha contains 12 unique vehicles. Each model has a name, artwork, resale value,
 | Epic | Purple |
 | Legendary | Gold |
 | Mythic | Red |
+| Exotic | Teal |
 
-Common covers older or budget vehicles. Mythic covers the most prestigious modern hypercars. All rarity tiers have text labels. The classes are Street, Sport, Muscle, Track, Exotic, Classic, and Collector. Collector uses black carbon styling and retains its rarity label and accent.
+Common covers older or budget vehicles. Mythic covers the most prestigious modern hypercars. Exotic rarity is reserved for exceptional collector rewards. It is independent of the Exotic vehicle class. All rarity tiers have text labels. The classes are Street, Sport, Muscle, Track, Exotic, Classic, and Collector. Collector uses black carbon styling and retains its rarity label and accent.
 
 My Garage supports sorting and filters, inspection of all four stats, selection for races, locking, and sale. Locked cars and the last race-eligible car cannot be sold. If the selected car is sold, another owned car becomes selected. Duplicate models are allowed.
 
 ## 3. Case lineup and economy
 
-Alpha offers four cases. Every case has a separate vehicle pool. Roll for rarity using the selected case's table and then choose uniformly among its vehicles in that tier. The odds are visible before purchase. The first opening is free when the player chooses Rookie. Every catalog car is eligible for both Alpha races.
+Alpha offers eight cases. Every case has a separate vehicle pool. Roll for rarity using the selected case's table and then choose uniformly among its vehicles in that tier. The odds are visible before purchase. Junkyard is free on every opening and the first drop uses a starter-ready subset at the same rarity odds. Spare cars can be sold for coins. After resolving a pending result, the player can open Junkyard again immediately.
 
-| Case | Price (coins) | Common | Uncommon | Rare | Epic | Legendary | Mythic |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Rookie | 120 | 70% | 25% | 5% | 0% | 0% | 0% |
-| Street | 240 | 35% | 45% | 18% | 2% | 0% | 0% |
-| Performance | 420 | 0% | 25% | 45% | 26% | 4% | 0% |
-| Elite | 700 | 0% | 0% | 20% | 55% | 24% | 1% |
+| Case | Price (coins) | Common | Uncommon | Rare | Epic | Legendary | Mythic | Exotic |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Junkyard | 0 | 95% | 5% | 0% | 0% | 0% | 0% | 0% |
+| Rookie | 250 | 52% | 30% | 18% | 0% | 0% | 0% | 0% |
+| Street | 700 | 18% | 37% | 32% | 13% | 0% | 0% | 0% |
+| Sport | 2,000 | 0% | 16% | 52% | 29% | 3% | 0% | 0% |
+| Performance | 5,500 | 0% | 0% | 25% | 50% | 25% | 0% | 0% |
+| Heritage | 9,000 | 0% | 0% | 40% | 42% | 17% | 0% | 1% |
+| Elite | 16,000 | 0% | 0% | 0% | 65% | 32% | 3% | 0% |
+| Hyper | 30,000 | 0% | 0% | 0% | 50% | 42% | 8% | 0% |
 
-Select and persist the reward before constructing the horizontal reel. The visual cards come from the selected case's pool and favor its common outcomes. Legendary and Mythic filler appearances are limited and kept away from the marker's neighboring slots at the stop. The reel illustrates the opening. The published table governs the actual draw. Cards move right to left, decelerate, and stop on the selected car. Skip reveals the same result immediately. The result offers Keep, Sell, and Go to Garage. Sale uses the garage's protection rules.
+Select and persist the reward before constructing the horizontal reel. Visual cards come from allowed tiers, favor common outcomes, and keep the rarest filler tiers away from the final marker. Skip reveals the same result immediately. The result offers Keep, Sell, and Go to Garage. Sale uses the garage's protection rules. The case soundtrack uses layered licensed recordings for selection, opening, reel movement and settling, and a distinct reveal for each rarity. The existing effects and master controls apply to case audio.
 
-| Temporary Alpha value | Coins |
-|---|---:|
-| Starting wallet | 60 |
-| Race entry | 0 |
-| Win | 100 |
-| Loss | 60 |
-
-Either outcome of the first race funds a second Rookie Case without selling the starter car. The four prices are temporary and configurable. Local development can waive the price of any case with Infinite Money.
+The starting wallet holds 60 coins. Race entry is free. Race payouts and the shared reward cooldown are described in the [Alpha 0.3 economy notes](docs/economy-alpha-0.3.md). Local development can waive the price of any case with Infinite Money.
 
 ## 4. Races
 

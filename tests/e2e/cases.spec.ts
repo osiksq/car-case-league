@@ -75,7 +75,7 @@ test('paid reel lands on the acquired car and its case survives reload', async (
   await expect(page.getByTestId('garage-car')).toHaveCount(1);
 });
 
-test('all forty vehicle images decode under the production base path', async ({ page }) => {
+test('all fifty vehicle images decode under the production base path', async ({ page }) => {
   await page.goto('./');
   const broken = await page.evaluate(async (indexes) => {
     const results = await Promise.all(indexes.map(async (index) => {
@@ -90,6 +90,6 @@ test('all forty vehicle images decode under the production base path', async ({ 
     }));
     return results.filter((index) => index !== null);
   }, cars.map(({ artIndex }) => artIndex));
-  expect(cars).toHaveLength(40);
+  expect(cars).toHaveLength(50);
   expect(broken).toEqual([]);
 });

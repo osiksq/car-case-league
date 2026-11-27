@@ -15,70 +15,80 @@ export const cases: Record<CaseId, CaseDefinition> = {
   junkyard: {
     name: 'Junkyard Case',
     price: 0,
-    odds: { Common: 95, Uncommon: 5, Rare: 0, Epic: 0, Legendary: 0, Mythic: 0 },
+    odds: { Common: 95, Uncommon: 5, Rare: 0, Epic: 0, Legendary: 0, Mythic: 0, Exotic: 0 },
     carIds: [
       'bravik-110', 'petrel-s1', 'dorvik-75', 'talmor-pico', 'norwyn-kite', 'velska-cargo',
       'ruskell-120', 'havrix-cabrio', 'elden-boxer', 'merovar-sprint', 'issara-twin', 'ordane-sedan',
+      'vostren-76', 'borvane-estate',
     ],
   },
   rookie: {
     name: 'Rookie Case',
     price: 250,
-    odds: { Common: 52, Uncommon: 30, Rare: 18, Epic: 0, Legendary: 0, Mythic: 0 },
+    odds: { Common: 52, Uncommon: 30, Rare: 18, Epic: 0, Legendary: 0, Mythic: 0, Exotic: 0 },
     carIds: [
       'bravik-110', 'petrel-s1', 'talmor-pico', 'norwyn-kite', 'ruskell-120', 'havrix-cabrio', 'elden-boxer',
       'kestovan-rx', 'merovar-sprint', 'issara-twin', 'malkor-ss', 'ordane-sedan', 'thalven-gt', 'cirven-sport',
+      'vostren-76', 'borvane-estate', 'raiven-16', 'harten-velo',
     ],
   },
   street: {
     name: 'Street Case',
     price: 700,
-    odds: { Common: 18, Uncommon: 37, Rare: 32, Epic: 13, Legendary: 0, Mythic: 0 },
+    odds: { Common: 18, Uncommon: 37, Rare: 32, Epic: 13, Legendary: 0, Mythic: 0, Exotic: 0 },
     carIds: [
       'petrel-s1', 'talmor-pico', 'norwyn-kite', 'kestovan-rx', 'merovar-sprint', 'narvik-rally',
       'issara-twin', 'ordane-sedan', 'thalven-gt', 'tavren-cup', 'karsen-v8', 'cirven-sport', 'quorven-rs', 'ralvex-turbo',
+      'raiven-16', 'harten-velo', 'shinari-ts', 'krayden-t6', 'bramlock-900',
     ],
   },
   sport: {
     name: 'Sport Case',
     price: 2_000,
-    odds: { Common: 0, Uncommon: 16, Rare: 52, Epic: 29, Legendary: 3, Mythic: 0 },
+    odds: { Common: 0, Uncommon: 16, Rare: 52, Epic: 29, Legendary: 3, Mythic: 0, Exotic: 0 },
     carIds: [
       'narvik-rally', 'malkor-ss', 'vesryn-dune', 'selaire-roadster', 'thalven-gt', 'tavren-cup', 'karsen-v8',
       'vossari-spyder', 'cirven-sport', 'kairox-r', 'quorven-rs', 'ralvex-turbo', 'ventari-s4', 'sorevik-t9',
+      'raiven-16', 'harten-velo', 'shinari-ts', 'krayden-t6', 'bramlock-900', 'vantesso-corsa',
     ],
   },
   performance: {
     name: 'Performance Case',
     price: 5_500,
-    odds: { Common: 0, Uncommon: 0, Rare: 25, Epic: 50, Legendary: 25, Mythic: 0 },
+    odds: { Common: 0, Uncommon: 0, Rare: 25, Epic: 50, Legendary: 25, Mythic: 0, Exotic: 0 },
     carIds: [
       'tavren-cup', 'karsen-v8', 'vossari-spyder', 'kairox-r', 'nivaro-gtx', 'quorven-rs', 'ralvex-turbo', 'ventari-s4',
       'sorevik-t9', 'trevos-r90', 'ikhara-gt',
+      'shinari-ts', 'krayden-t6', 'bramlock-900', 'vantesso-corsa',
     ],
   },
   heritage: {
     name: 'Heritage Case',
     price: 9_000,
-    odds: { Common: 0, Uncommon: 0, Rare: 40, Epic: 42, Legendary: 18, Mythic: 0 },
+    odds: { Common: 0, Uncommon: 0, Rare: 40, Epic: 42, Legendary: 17, Mythic: 0, Exotic: 1 },
     carIds: [
       'dorsenne-v12', 'aldoven-63', 'bellovar-mk2', 'solvara-sr6', 'melvane-gt1', 'viremont-aurum', 'ardenza-proto',
+      'calderon-lm64',
     ],
   },
   elite: {
     name: 'Elite Case',
     price: 16_000,
-    odds: { Common: 0, Uncommon: 0, Rare: 0, Epic: 65, Legendary: 32, Mythic: 3 },
+    odds: { Common: 0, Uncommon: 0, Rare: 0, Epic: 65, Legendary: 32, Mythic: 3, Exotic: 0 },
     carIds: [
       'kairox-r', 'nivaro-gtx', 'quorven-rs', 'solvara-sr6', 'melvane-gt1', 'ventari-s4',
       'viremont-aurum', 'sorevik-t9', 'trevos-r90', 'ardenza-proto', 'ikhara-gt', 'veldris-zenith', 'orvane-eclipse',
+      'vantesso-corsa', 'nythera-rift',
     ],
   },
   hyper: {
     name: 'Hyper Case',
     price: 30_000,
-    odds: { Common: 0, Uncommon: 0, Rare: 0, Epic: 50, Legendary: 42, Mythic: 8 },
-    carIds: ['nivaro-gtx', 'ventari-s4', 'trevos-r90', 'ikhara-gt', 'veldris-zenith', 'orvane-eclipse', 'novaryn-zero'],
+    odds: { Common: 0, Uncommon: 0, Rare: 0, Epic: 50, Legendary: 42, Mythic: 8, Exotic: 0 },
+    carIds: [
+      'nivaro-gtx', 'ventari-s4', 'trevos-r90', 'ikhara-gt', 'veldris-zenith', 'orvane-eclipse', 'novaryn-zero',
+      'nythera-rift',
+    ],
   },
 };
 
@@ -149,6 +159,7 @@ export function buildCaseReel(id: CaseId, winner: Car, seed?: number, firstJunky
   const scarceFillerLimit: Partial<Record<Rarity, number>> = {
     Legendary: Math.floor(random() * 3),
     Mythic: 1,
+    Exotic: 1,
   };
   const commonTier = tiers.reduce((best, tier) => tier.weight > best.weight ? tier : best);
   const fillerTiers = tiers.map((tier) => tier.rarity === 'Mythic' ? { ...tier, weight: Math.min(tier.weight, 1.5) } : tier);

@@ -14,8 +14,12 @@ test('production excludes developer controls and ignores development data', asyn
   await page.getByRole('button', { name: 'Open Free Case', exact: true }).click();
   await page.getByRole('button', { name: 'Skip Animation', exact: true }).click();
   await page.getByRole('button', { name: 'Keep', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Open Free Case', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Open Free Case', exact: true })).toBeEnabled();
   await expect(page.getByTestId('coin-balance')).toHaveText('60');
+
+  await page.getByRole('button', { name: 'Back to Cases', exact: true }).click();
+  await page.getByRole('button', { name: 'Rookie Case', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open Case', exact: true })).toBeDisabled();
 
   const assets = new URL('../../dist/assets/', import.meta.url);
   const scripts = (await readdir(assets)).filter((file) => file.endsWith('.js'));
@@ -39,7 +43,7 @@ test('public sandbox opens paid cases without modifying the normal save', async 
   await button('Junkyard Case').click();
   await button('Open Free Case').click();
   await button('Keep').click();
-  await expect(button('Open Free Case')).toBeDisabled();
+  await expect(button('Open Free Case')).toBeEnabled();
   const normalSave = await page.evaluate(() => localStorage.getItem('car-case-league.save'));
   expect(normalSave).toBeTruthy();
   await expect(wallet).toHaveText('60');
@@ -57,7 +61,7 @@ test('public sandbox opens paid cases without modifying the normal save', async 
   await toggleSandbox();
   await expect(wallet).toHaveText('60');
   await button('Junkyard Case').click();
-  await expect(button('Open Free Case')).toBeDisabled();
+  await expect(button('Open Free Case')).toBeEnabled();
   await page.reload();
   await expect(wallet).toHaveText('60');
   expect(await page.evaluate(() => localStorage.getItem('car-case-league.save'))).toBe(normalSave);

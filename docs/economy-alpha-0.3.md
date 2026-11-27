@@ -1,5 +1,7 @@
 # Alpha 0.3 economy and collection
 
+> Historical balance snapshot. Junkyard no longer has an opening cooldown. See [the current Junkyard analysis](junkyard-economy.md) for the new estimates.
+
 ## Rewards and cases
 
 Players start with 60 coins. The first Junkyard Case rolls at the same rarity odds as later ones and restricts the pool to Bravik 110, Petrel S1 and Merovar Sprint. The 60-second cooldown starts when the case is awarded. Spare cars can be sold.

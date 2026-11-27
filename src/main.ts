@@ -7,7 +7,7 @@ import { events, tactics, type EventId, type Tactic } from './game/config';
 import { gameClockNow } from './game/economy';
 import { addDeveloperCoins, developerButton, developerDialog, developerSaveKey, openDeveloperCase } from './dev/developer';
 import {
-  createGame, finishCase, finishRace, junkyardRemainingMs, openCase, readSave, resetGame, selectCar, sellCar,
+  createGame, finishCase, finishRace, openCase, readSave, selectCar, sellCar,
   startCareerRace, startRace, storageKey, toggleLock, writeSave, type GameState,
 } from './game/save';
 import { animateRace, animateRoulette } from './ui/animation';
@@ -16,7 +16,7 @@ import { careerScreen } from './ui/career';
 import { escapeHtml, icon, money } from './ui/components';
 import {
   caseAnimationScreen, caseCollectionScreen, caseResultScreen, casesScreen, carsById, garageScreen,
-  raceAnimationScreen, raceResultScreen, raceSetupScreen, updateCaseCountdown, updateRaceReward,
+  raceAnimationScreen, raceResultScreen, raceSetupScreen, updateRaceReward,
   type GarageFilters, type GarageSort,
 } from './ui/screens';
 import { createSoundPanel, soundButton, syncSoundButton } from './ui/sound-panel';
@@ -148,12 +148,9 @@ function gameScreen() {
     }
     case 'cases': {
       const unlimited = hasUnlimitedCoins();
-      const now = gameClockNow();
-      if (!selectedCase) return caseCollectionScreen(game, unlimited ? 0 : junkyardRemainingMs(game, now));
-      const canOpen = unlimited || (selectedCase === 'junkyard'
-        ? junkyardRemainingMs(game, now) === 0
-        : game.coins >= casePrice(selectedCase));
-      return casesScreen(game, selectedCase, canOpen, now, unlimited);
+      if (!selectedCase) return caseCollectionScreen(game);
+      const canOpen = unlimited || game.coins >= casePrice(selectedCase);
+      return casesScreen(game, selectedCase, canOpen, unlimited);
     }
   }
 }
@@ -163,7 +160,7 @@ function dialogMarkup() {
     <div class="panel-heading"><h2 id="settings-title">Settings</h2></div>
     <label class="motion-setting"><input type="checkbox" data-filter="motion"${reducedMotion() ? ' checked' : ''}${mediaMotion.matches ? ' disabled' : ''}> Reduce Motion</label>
     ${mediaMotion.matches ? '<p class="action-hint">Your device has requested reduced motion.</p>' : ''}
-    <p>Reset clears your cars, coins, race history and career on this device. The Junkyard cooldown continues.</p>
+    <p>Reset clears your cars, coins, race history and career on this device.</p>
     <div class="button-row">
       <button type="button" class="button button-secondary" data-action="close-settings">Close</button>
       <button type="button" class="button button-secondary" data-action="reset">Reset Progress</button>
@@ -390,7 +387,7 @@ function beginRace() {
 
 function resetProgress(message: string) {
   if (!window.confirm(message)) return;
-  void transact(resetGame, () => {
+  void transact(createGame, () => {
     screen = 'cases';
     selectedCase = null;
     careerEntry = null;
@@ -604,6 +601,5 @@ render();
 window.setInterval(() => {
   if (document.hidden || animation || commandPending) return;
   const now = gameClockNow();
-  updateCaseCountdown(app, hasUnlimitedCoins() ? 0 : junkyardRemainingMs(game, now));
   updateRaceReward(app, game, screen === 'career' ? careerEntry ?? undefined : undefined, now);
 }, 250);
