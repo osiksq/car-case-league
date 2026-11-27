@@ -25,11 +25,7 @@ test('the collection displays all eight models in price order and opens their de
     else await expect(action).toBeDisabled();
 
     const odds = page.getByRole('region', { name: 'Drop odds' }).getByRole('listitem');
-    await expect(odds).toHaveCount(rarities.length);
-    for (const tier of rarities) {
-      const row = odds.filter({ has: page.getByText(tier, { exact: true }) });
-      await expect(row.getByText(`${entry.odds[tier]}%`, { exact: true })).toBeVisible();
-    }
+    await expect(odds).toHaveText(rarities.map((tier) => new RegExp(`^${tier} *${entry.odds[tier]}%$`)));
     if (!await pool.evaluate((element: HTMLDetailsElement) => element.open)) {
       await pool.locator('summary').click();
     }
@@ -75,7 +71,7 @@ test('paid reel lands on the acquired car and its case survives reload', async (
   await expect(page.getByTestId('garage-car')).toHaveCount(1);
 });
 
-test('all forty vehicle images decode under the production base path', async ({ page }) => {
+test('all fifty vehicle images decode under the production base path', async ({ page }) => {
   await page.goto('./');
   const broken = await page.evaluate(async (indexes) => {
     const results = await Promise.all(indexes.map(async (index) => {
@@ -90,6 +86,6 @@ test('all forty vehicle images decode under the production base path', async ({ 
     }));
     return results.filter((index) => index !== null);
   }, cars.map(({ artIndex }) => artIndex));
-  expect(cars).toHaveLength(40);
+  expect(cars).toHaveLength(50);
   expect(broken).toEqual([]);
 });

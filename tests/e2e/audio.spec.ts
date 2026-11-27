@@ -103,6 +103,53 @@ test('blocking Web Audio does not interrupt case awards or result recovery', asy
   expect(errors).toEqual([]);
 });
 
+test('a full case opening plays the recorded selection, reel build and matching reveal', async ({ page }) => {
+  await page.addInitScript(() => {
+    const responseBytes = Response.prototype.arrayBuffer;
+    const decode = AudioContext.prototype.decodeAudioData;
+    const start = AudioBufferSourceNode.prototype.start;
+    const inputFiles = new WeakMap<ArrayBuffer, string>();
+    const decodedFiles = new WeakMap<AudioBuffer, string>();
+    const played: string[] = [];
+
+    Response.prototype.arrayBuffer = async function () {
+      const bytes = await responseBytes.call(this);
+      const asset = this.url.match(/\/audio\/([^/]+)\.mp3$/)?.[1];
+      if (asset) inputFiles.set(bytes, asset);
+      return bytes;
+    };
+    AudioContext.prototype.decodeAudioData = async function (bytes, onSuccess, onError) {
+      const input = inputFiles.get(bytes);
+      const buffer = await decode.call(this, bytes, onSuccess, onError);
+      if (input) decodedFiles.set(buffer, input);
+      return buffer;
+    };
+    AudioBufferSourceNode.prototype.start = function (...args) {
+      const asset = this.buffer && decodedFiles.get(this.buffer);
+      if (asset) {
+        played.push(asset);
+        document.documentElement.dataset.playedAudio = played.join(',');
+      }
+      start.apply(this, args);
+    };
+  });
+  await page.goto('./');
+  const root = page.locator('html');
+  await button(page, 'Junkyard Case').click();
+  await expect(root).toHaveAttribute('data-played-audio', /case-select/);
+  await button(page, 'Open Free Case').click();
+  await expect(button(page, 'Skip Animation')).toBeVisible();
+  await expect(root).toHaveAttribute('data-played-audio', /case-open/, { timeout: 3_000 });
+  await expect(root).toHaveAttribute('data-played-audio', /reel-rise/, { timeout: 3_000 });
+  await expect(root).toHaveAttribute('data-played-audio', /reel-tick/);
+  await expect(page.getByRole('heading', { name: 'Case Result' })).toBeVisible();
+  const badges = page.locator('.case-result .badges');
+  const rarity = await badges.getByText(/^(Common|Uncommon)$/).innerText();
+  const played = (await root.getAttribute('data-played-audio'))?.split(',') ?? [];
+  expect(played.filter((asset) => asset === 'reel-rise')).toHaveLength(1);
+  await expect(root).toHaveAttribute('data-played-audio', new RegExp(`reel-stop,.*reward-${rarity.toLowerCase()}`));
+});
+
 test('a hidden tab pauses the roulette and stays quiet until foreground playback resumes', async ({ page }) => {
   await page.clock.install();
   await page.addInitScript(() => {

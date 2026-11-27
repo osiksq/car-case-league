@@ -7,7 +7,7 @@ import { caseIds, casePool, casePrice, cases, type CaseId } from '../game/cases'
 import { careerEvents, leagues, type CareerEvent, type CareerEventId, type CareerProgress } from '../game/career';
 import { economy, gameClockNow } from '../game/economy';
 import { previewRaceOpponent, raceRatings } from '../game/race';
-import { junkyardRemainingMs, raceRewardPreview, type GameState } from '../game/save';
+import { raceRewardPreview, type GameState } from '../game/save';
 import { careerAward } from './career';
 import { carCard, carImage, carStyle, carStats, escapeHtml, icon, money, oddsTable, pageHeading, rarityBadge, statEntries } from './components';
 import { raceSceneMarkup } from './race-scene';
@@ -55,10 +55,6 @@ function cooldownTime(ms: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
-function junkyardStatus(ms: number): string {
-  return ms > 0 ? `Next free case in ${cooldownTime(ms)}` : 'Free case ready';
-}
-
 function caseStage(id: CaseId): string {
   return `<span class="case-stage" aria-hidden="true">
     <span class="case-crate">
@@ -70,7 +66,7 @@ function caseStage(id: CaseId): string {
   </span>`;
 }
 
-export function caseCollectionScreen(game: GameState, remainingMs: number) {
+export function caseCollectionScreen(game: GameState) {
   const orderedCases = [...caseIds].sort((left, right) => casePrice(left) - casePrice(right));
   return `<section class="case-screen" aria-labelledby="screen-title">
     <header class="case-header">
@@ -89,7 +85,7 @@ export function caseCollectionScreen(game: GameState, remainingMs: number) {
           <span class="case-display-caption">
             <strong id="collection-name-${id}">${cases[id].name}</strong>
             <span class="case-display-price" id="collection-price-${id}">${id === 'junkyard'
-              ? `<span>Free</span><span data-junkyard-status>${collectionAvailability(remainingMs)}</span>`
+              ? 'Free'
               : `${icon('coin')} ${money(casePrice(id))} coins`}</span>
           </span>
         </button>
@@ -98,26 +94,10 @@ export function caseCollectionScreen(game: GameState, remainingMs: number) {
   </section>`;
 }
 
-function collectionAvailability(ms: number): string {
-  return ms > 0 ? `in ${cooldownTime(ms)}` : 'Ready';
-}
-
-export function updateCaseCountdown(root: ParentNode, remainingMs: number): void {
-  const status = root.querySelector<HTMLElement>('[data-junkyard-status]');
-  const shortStatus = collectionAvailability(remainingMs);
-  if (status && status.textContent !== shortStatus) status.textContent = shortStatus;
-  const countdown = root.querySelector<HTMLElement>('[data-testid="junkyard-countdown"]');
-  const button = root.querySelector<HTMLButtonElement>('[data-junkyard-open]');
-  const label = junkyardStatus(remainingMs);
-  if (countdown && countdown.textContent !== label) countdown.textContent = label;
-  if (button && button.disabled !== (remainingMs > 0)) button.disabled = remainingMs > 0;
-}
-
-export function casesScreen(game: GameState, activeCase: CaseId, canOpen: boolean, now = gameClockNow(), unlimited = false) {
+export function casesScreen(game: GameState, activeCase: CaseId, canOpen: boolean, unlimited = false) {
   const selected = cases[activeCase];
   const price = casePrice(activeCase);
   const free = activeCase === 'junkyard';
-  const remainingMs = unlimited ? 0 : junkyardRemainingMs(game, now);
   const starterOpening = free && game.garage.length === 0;
   const pool = casePool(activeCase, starterOpening);
   const artwork = caseArtwork[activeCase];
@@ -132,13 +112,12 @@ export function casesScreen(game: GameState, activeCase: CaseId, canOpen: boolea
         <div class="case-content">
           <h1 id="screen-title" tabindex="-1">${selected.name}</h1>
           <button type="button" class="button button-primary case-open-button" data-action="open-case"
-            ${free ? 'data-junkyard-open aria-describedby="junkyard-countdown"' : 'aria-describedby="selected-case-price"'}${(free ? remainingMs === 0 : canOpen) ? '' : ' disabled'}>
+            aria-describedby="selected-case-price"${canOpen ? '' : ' disabled'}>
             ${icon('cases')} ${free ? 'Open Free Case' : 'Open Case'}
           </button>
-          ${free
-            ? `<div class="junkyard-status"><span role="timer" id="junkyard-countdown" data-testid="junkyard-countdown">${junkyardStatus(remainingMs)}</span>
-                <span>${unlimited ? 'Unlimited openings are active.' : `One free opening every ${economy.junkyardCooldownMs / 1000}s.`}</span></div>`
-            : `<span class="case-price" id="selected-case-price">${icon('coin')} ${unlimited ? 'Free with unlimited coins' : `${money(price)} coins`}</span>`}
+          <span class="case-price" id="selected-case-price">${free
+            ? 'Free · Unlimited openings'
+            : `${icon('coin')} ${unlimited ? 'Free with unlimited coins' : `${money(price)} coins`}`}</span>
           ${free || canOpen ? '' : '<p class="action-hint">Win Career competitions or sell spare cars to earn coins.</p>'}
         </div>
       </article>

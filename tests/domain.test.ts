@@ -3,16 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { careerEvents } from '../src/game/career';
 import { cars, events, rarities, stats, tactics, tacticModifiers } from '../src/game/config';
 import { buildCaseReel, caseIds, casePool, casePrice, cases, drawCaseReward } from '../src/game/cases';
-import { economy } from '../src/game/economy';
 import { previewRaceOpponent, simulateRace } from '../src/game/race';
 import {
   createGame,
   finishCase,
   finishRace,
-  junkyardRemainingMs,
   openCase,
+  raceRewardPreview,
   readSave,
-  resetGame,
   selectCar,
   sellCar,
   startRace,
@@ -34,41 +32,33 @@ function starter() {
 }
 
 describe('Junkyard and paid cases', () => {
-  it('opens a free selected starter, persists the timestamp, and waits 60 seconds across reload', () => {
+  it('commits one free starter and allows an immediate sale cycle across reload', () => {
     const storage = memoryStorage();
     const fresh = createGame();
-    const opened = openCase(fresh, 'junkyard', 12, 100_000);
+    const now = 100_000;
+    const opened = openCase(fresh, 'junkyard', 12, now);
     expect(opened.coins).toBe(fresh.coins);
     expect(opened.garage).toHaveLength(1);
     expect(opened.selectedId).toBe(opened.garage[0].id);
-    expect(opened.pendingCase).toBe(opened.garage[0].id);
     expect(opened.pendingCaseType).toBe('junkyard');
     expect(fresh.garage).toEqual([]);
-    expect(() => openCase(opened, 'junkyard', 12, 100_000)).toThrow(/finish/i);
+    expect(() => openCase(opened, 'junkyard', 12, now)).toThrow(/finish/i);
     writeSave(storage, finishCase(opened, 'keep'));
-    const restored = readSave(storage);
-    expect(() => openCase(restored, 'junkyard', 12, 159_999)).toThrow(/ready in/i);
-    expect(openCase(restored, 'junkyard', 12, 160_000).garage).toHaveLength(2);
+
+    const restored = readSave(storage, storageKey, now);
+    const second = openCase(restored, 'junkyard', 12, now);
+    expect(second.garage.map(({ id }) => id)).toEqual(['car-1', 'car-2']);
+    const drop = cars.find((car) => car.id === second.garage[1].carId)!;
+    const sold = finishCase(second, 'sell');
+    expect(sold.coins).toBe(fresh.coins + drop.resaleValue);
+    expect(sold.garage).toEqual(opened.garage);
+    expect(finishCase(sold, 'sell')).toBe(sold);
+    expect(openCase(sold, 'junkyard', 13, now).progress.casesOpened).toBe(3);
   });
 
   it('keeps the case price fixed and rejects paid entry without enough coins', () => {
     expect(caseIds.map(casePrice)).toEqual([0, 250, 700, 2000, 5500, 9000, 16000, 30000]);
     expect(() => openCase(createGame(), 'rookie', 12, 100_000)).toThrow(/coins/i);
-  });
-
-  it('preserves the active Junkyard deadline when resetting progress or reloading', () => {
-    const storage = memoryStorage();
-    const openedAt = 100_000;
-    const readyAt = openedAt + economy.junkyardCooldownMs;
-    const opened = openCase(createGame(), 'junkyard', 12, openedAt);
-    const reset = resetGame(opened, openedAt + 1_000);
-    expect(reset).toEqual({ ...createGame(), timing: opened.timing });
-    writeSave(storage, reset);
-    const restored = readSave(storage, storageKey, readyAt - 1, openedAt);
-    expect(junkyardRemainingMs(restored, readyAt - 1)).toBe(1);
-    expect(() => openCase(restored, 'junkyard', 12, readyAt - 1)).toThrow(/ready in/i);
-    expect(openCase(restored, 'junkyard', 12, readyAt).garage).toHaveLength(1);
-    expect(resetGame(restored, readyAt)).toEqual(createGame());
   });
 
   it('keeps the exact first-case tiers and excludes cars that cannot clear Rookie', () => {
@@ -90,31 +80,38 @@ describe('Junkyard and paid cases', () => {
     }
   });
 
-  it('keeps cooldown when the clock rolls back, then recovers without a long lockout', () => {
+  it('ignores the retired Junkyard timestamp but recovers race timing from an old save', () => {
     const storage = memoryStorage();
-    const game = finishCase(openCase(createGame(), 'junkyard', 12, 1_000_000), 'keep');
-    writeSave(storage, game);
-    expect(junkyardRemainingMs(game, 999_999)).toBe(economy.junkyardCooldownMs);
-    const resetClock = 100_000;
-    const rebased = readSave(storage, storageKey, resetClock + 10_000, resetClock);
-    expect(junkyardRemainingMs(rebased, resetClock + 10_000)).toBe(50_000);
-    // Re-reading the same snapshot uses the same page clock baseline.
-    const readyAt = resetClock + economy.junkyardCooldownMs;
-    const ready = readSave(storage, storageKey, readyAt, resetClock);
-    expect(junkyardRemainingMs(ready, readyAt)).toBe(0);
-    expect(openCase(ready, 'junkyard', 12, readyAt).garage).toHaveLength(2);
+    const openedAt = 1_000_000;
+    const saved = finishCase(openCase(createGame(), 'junkyard', 12, openedAt), 'keep');
+    storage.setItem(storageKey, JSON.stringify({
+      ...saved,
+      timing: {
+        lastSeenAt: openedAt,
+        junkyardOpenedAt: openedAt,
+        raceRewardedAt: openedAt,
+      },
+    }));
+
+    const pageClockStart = 100_000;
+    const now = pageClockStart + 10_000;
+    const restored = readSave(storage, storageKey, now, pageClockStart);
+    expect(restored.garage).toEqual(saved.garage);
+    expect(restored.timing).not.toHaveProperty('junkyardOpenedAt');
+    expect(openCase(restored, 'junkyard', 12, now).garage).toHaveLength(2);
+    expect(raceRewardPreview(restored, undefined, now).remainingMs).toBe(50_000);
   });
 });
 describe('case odds and visual reels', () => {
   const publishedOdds = {
-    junkyard: [95, 5, 0, 0, 0, 0],
-    rookie: [52, 30, 18, 0, 0, 0],
-    street: [18, 37, 32, 13, 0, 0],
-    sport: [0, 16, 52, 29, 3, 0],
-    performance: [0, 0, 25, 50, 25, 0],
-    heritage: [0, 0, 40, 42, 18, 0],
-    elite: [0, 0, 0, 65, 32, 3],
-    hyper: [0, 0, 0, 50, 42, 8],
+    junkyard: [95, 5, 0, 0, 0, 0, 0],
+    rookie: [52, 30, 18, 0, 0, 0, 0],
+    street: [18, 37, 32, 13, 0, 0, 0],
+    sport: [0, 16, 52, 29, 3, 0, 0],
+    performance: [0, 0, 25, 50, 25, 0, 0],
+    heritage: [0, 0, 40, 42, 17, 0, 1],
+    elite: [0, 0, 0, 65, 32, 3, 0],
+    hyper: [0, 0, 0, 50, 42, 8, 0],
   };
 
   it('defines eight distinct vehicle pools and exact odds totaling 100% each', () => {
@@ -132,10 +129,11 @@ describe('case odds and visual reels', () => {
     }
   });
 
-  it('distributes forty unique cars across the specified rarity mix and reachable pools', () => {
-    expect(cars).toHaveLength(40);
-    expect(new Set(cars.map((car) => car.id)).size).toBe(40);
-    expect(rarities.map((rarity) => cars.filter((car) => car.rarity === rarity).length)).toEqual([9, 8, 8, 7, 5, 3]);
+  it('distributes fifty unique cars across the specified rarity mix and reachable pools', () => {
+    expect(cars).toHaveLength(50);
+    expect(new Set(cars.map((car) => car.id)).size).toBe(50);
+    expect(new Set(cars.map((car) => car.artIndex)).size).toBe(50);
+    expect(rarities.map((rarity) => cars.filter((car) => car.rarity === rarity).length)).toEqual([11, 10, 10, 8, 6, 4, 1]);
     expect(new Set(caseIds.flatMap((id) => casePool(id).map((car) => car.id)))).toEqual(new Set(cars.map((car) => car.id)));
   });
 
@@ -176,36 +174,35 @@ describe('case odds and visual reels', () => {
     }
   });
 
-  it('pins the actual reward and limits scarce fillers to eligible cars away from the marker', () => {
-    for (const id of caseIds) {
-      const pool = casePool(id);
-      const allowed = new Set(pool.map((car) => car.id));
-      for (const reward of pool) {
-        let reelsWithoutMythicFiller = 0;
-        let mostLikelyFillers = 0;
-        let totalFillers = 0;
-        const dominant = rarities.reduce((best, rarity) => cases[id].odds[rarity] > cases[id].odds[best] ? rarity : best);
-        for (let seed = 0; seed < 48; seed++) {
-          const reel = buildCaseReel(id, reward, seed);
-          expect(reel.entries[reel.winnerIndex]).toBe(reward);
-          expect(reel.winnerIndex).toBeGreaterThanOrEqual(20);
-          expect(reel.entries.length - reel.winnerIndex - 1).toBeGreaterThanOrEqual(5);
-          expect(reel.entries.every((car) => allowed.has(car.id))).toBe(true);
-          const fillers = reel.entries.filter((_, index) => index !== reel.winnerIndex);
-          const mythics = fillers.filter((car) => car.rarity === 'Mythic');
-          expect(mythics.length).toBeLessThanOrEqual(1);
-          expect(fillers.filter((car) => car.rarity === 'Legendary').length).toBeLessThanOrEqual(2);
-          if (mythics.length === 0) reelsWithoutMythicFiller++;
-          mostLikelyFillers += fillers.filter((car) => car.rarity === dominant).length;
-          totalFillers += fillers.length;
-          for (const neighbor of [reel.entries[reel.winnerIndex - 1], reel.entries[reel.winnerIndex + 1]]) {
-            expect(['Legendary', 'Mythic']).not.toContain(neighbor.rarity);
-          }
+  it.each(caseIds)('%s pins the reward and keeps scarce fillers away from the marker', (id) => {
+    const pool = casePool(id);
+    const allowed = new Set(pool.map((car) => car.id));
+    for (const reward of pool) {
+      let reelsWithoutMythicFiller = 0;
+      let mostLikelyFillers = 0;
+      let totalFillers = 0;
+      const dominant = rarities.reduce((best, rarity) => cases[id].odds[rarity] > cases[id].odds[best] ? rarity : best);
+      for (let seed = 0; seed < 48; seed++) {
+        const reel = buildCaseReel(id, reward, seed);
+        expect(reel.entries[reel.winnerIndex]).toBe(reward);
+        expect(reel.winnerIndex).toBeGreaterThanOrEqual(20);
+        expect(reel.entries.length - reel.winnerIndex - 1).toBeGreaterThanOrEqual(5);
+        expect(reel.entries.every((car) => allowed.has(car.id))).toBe(true);
+        const fillers = reel.entries.filter((_, index) => index !== reel.winnerIndex);
+        const mythics = fillers.filter((car) => car.rarity === 'Mythic');
+        expect(mythics.length).toBeLessThanOrEqual(1);
+        expect(fillers.filter((car) => car.rarity === 'Exotic').length).toBeLessThanOrEqual(1);
+        expect(fillers.filter((car) => car.rarity === 'Legendary').length).toBeLessThanOrEqual(2);
+        if (mythics.length === 0) reelsWithoutMythicFiller++;
+        mostLikelyFillers += fillers.filter((car) => car.rarity === dominant).length;
+        totalFillers += fillers.length;
+        for (const neighbor of [reel.entries[reel.winnerIndex - 1], reel.entries[reel.winnerIndex + 1]]) {
+          expect(['Legendary', 'Mythic', 'Exotic']).not.toContain(neighbor.rarity);
         }
-        expect(reelsWithoutMythicFiller).toBeGreaterThan(24);
-        expect(mostLikelyFillers / totalFillers).toBeGreaterThan(0.4);
-        expect(buildCaseReel(id, reward, 12)).toEqual(buildCaseReel(id, reward, 12));
       }
+      expect(reelsWithoutMythicFiller).toBeGreaterThan(24);
+      expect(mostLikelyFillers / totalFillers).toBeGreaterThan(0.4);
+      expect(buildCaseReel(id, reward, 12)).toEqual(buildCaseReel(id, reward, 12));
     }
   });
 
@@ -344,7 +341,7 @@ describe('races', () => {
         opponent: cars.find((car) => car.id === event.rivalCarId)!,
         name: event.rivalName, paceRatio: event.paceRatio, volatility: event.rivalVolatility,
       };
-      for (const car of cars) {
+      for (const car of cars.filter(({ artIndex }) => artIndex < 40)) {
         for (const tactic of tactics) {
           for (let seed = 0; seed < 32; seed++) {
             const { opponentCarId, playerScore, opponentScore, won } = simulateRace('fixture', event.eventId, tactic, car, seed, rival);

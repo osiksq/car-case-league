@@ -118,27 +118,21 @@ test('layout fits the viewport including on mobile', async ({ page }) => {
   );
 });
 
-test('Junkyard cooldown is saved and the next car can be sold', async ({ page }) => {
-  await page.clock.install({ time: new Date('2026-11-23T12:00:00Z') });
+test('the next Junkyard case can be opened and sold immediately after reload', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const button = (name: string) => page.getByRole('button', { name, exact: true });
   await page.goto('./');
   await button('Junkyard Case').click();
   await button('Open Free Case').click();
   await button('Keep').click();
-  await expect(button('Open Free Case')).toBeDisabled();
-  const opened = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).progress.casesOpened, storageKey);
-  expect(opened).toBe(1);
-  await page.reload();
-  await expect(button('Junkyard Case')).toContainText(/in \d:\d{2}/);
-  await button('Junkyard Case').click();
-  await expect(button('Open Free Case')).toBeDisabled();
-  await expect(page.getByTestId('junkyard-countdown')).toBeVisible();
-  await page.clock.fastForward(60_000);
   await expect(button('Open Free Case')).toBeEnabled();
+  await page.reload();
+  await expect(button('Junkyard Case')).toContainText('Free');
+  await button('Junkyard Case').click();
+  await expect(page.getByRole('timer')).toHaveCount(0);
   await button('Open Free Case').click();
   await button('Sell').click();
-  await expect(button('Open Free Case')).toBeDisabled();
+  await expect(button('Open Free Case')).toBeEnabled();
   await expect(page.getByTestId('coin-balance')).not.toHaveText('60');
   await button('My Garage').click();
   await expect(page.getByTestId('garage-car')).toHaveCount(1);

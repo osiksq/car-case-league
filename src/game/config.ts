@@ -1,4 +1,4 @@
-export const rarities = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic'] as const;
+export const rarities = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic', 'Exotic'] as const;
 export type Rarity = (typeof rarities)[number];
 
 export const classes = ['Street', 'Sport', 'Muscle', 'Track', 'Exotic', 'Classic', 'Collector'] as const;
@@ -219,5 +219,45 @@ export const cars: readonly Car[] = [
   {
     id: 'novaryn-zero', name: 'Novaryn Zero', rarity: 'Mythic', class: 'Exotic',
     stats: { speed: 97, acceleration: 90, handling: 98, reliability: 67 }, resaleValue: 430, artIndex: 39,
+  },
+  {
+    id: 'vostren-76', name: 'Vostren 76', rarity: 'Common', class: 'Classic',
+    stats: { speed: 35, acceleration: 38, handling: 53, reliability: 58 }, resaleValue: 21, artIndex: 40,
+  },
+  {
+    id: 'borvane-estate', name: 'Borvane Estate', rarity: 'Common', class: 'Street',
+    stats: { speed: 32, acceleration: 34, handling: 45, reliability: 71 }, resaleValue: 19, artIndex: 41,
+  },
+  {
+    id: 'raiven-16', name: 'Raiven 1.6', rarity: 'Uncommon', class: 'Sport',
+    stats: { speed: 53, acceleration: 61, handling: 69, reliability: 49 }, resaleValue: 44, artIndex: 42,
+  },
+  {
+    id: 'harten-velo', name: 'Harten Velo', rarity: 'Uncommon', class: 'Street',
+    stats: { speed: 57, acceleration: 54, handling: 60, reliability: 66 }, resaleValue: 41, artIndex: 43,
+  },
+  {
+    id: 'shinari-ts', name: 'Shinari TS', rarity: 'Rare', class: 'Sport',
+    stats: { speed: 63, acceleration: 67, handling: 83, reliability: 60 }, resaleValue: 83, artIndex: 44,
+  },
+  {
+    id: 'krayden-t6', name: 'Krayden T6', rarity: 'Rare', class: 'Sport',
+    stats: { speed: 68, acceleration: 66, handling: 68, reliability: 76 }, resaleValue: 85, artIndex: 45,
+  },
+  {
+    id: 'bramlock-900', name: 'Bramlock 900', rarity: 'Epic', class: 'Muscle',
+    stats: { speed: 85, acceleration: 99, handling: 42, reliability: 45 }, resaleValue: 147, artIndex: 46,
+  },
+  {
+    id: 'vantesso-corsa', name: 'Vantesso Corsa', rarity: 'Legendary', class: 'Track',
+    stats: { speed: 86, acceleration: 81, handling: 93, reliability: 76 }, resaleValue: 230, artIndex: 47,
+  },
+  {
+    id: 'nythera-rift', name: 'Nythera Rift', rarity: 'Mythic', class: 'Exotic',
+    stats: { speed: 100, acceleration: 95, handling: 83, reliability: 64 }, resaleValue: 415, artIndex: 48,
+  },
+  {
+    id: 'calderon-lm64', name: 'Calderon LM64', rarity: 'Exotic', class: 'Collector',
+    stats: { speed: 78, acceleration: 69, handling: 85, reliability: 93 }, resaleValue: 520, artIndex: 49,
   },
 ];

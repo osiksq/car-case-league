@@ -1,5 +1,7 @@
 # Alpha 0.4.1 bug fix and sound rework
 
+> Release history. The later [Junkyard update](junkyard-economy.md) retired the free-case cooldown by design.
+
 ## Junkyard
 
 The unmodified production build from commit `bf53446` allowed a second normal-mode Junkyard opening 1,371 ms after the first. The browser sequence was opening the free case, dismissing the result, confirming Reset Progress, and opening Junkyard again. Reset assigned an empty timing record, so the domain validator no longer had a last-opening timestamp. Case changes, a garage visit, and a regular reload preserved the cooldown in that baseline run.

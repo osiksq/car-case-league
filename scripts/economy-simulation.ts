@@ -4,7 +4,7 @@ import { cars, rarities, tactics, type Car, type Tactic } from '../src/game/conf
 import { createRandom } from '../src/game/random';
 import { simulateRace } from '../src/game/race';
 import {
-  createGame, finishCase, finishRace, junkyardRemainingMs, openCase, raceRewardPreview, selectCar,
+  createGame, finishCase, finishRace, openCase, raceRewardPreview, selectCar,
   startCareerRace, startRace, type GameState, type OwnedCar,
 } from '../src/game/save';
 
@@ -17,8 +17,11 @@ const paidCases = caseIds.filter((id) => cases[id].price > 0);
 const alternativeHyperPrice = 24_000;
 const catalog = new Map(cars.map((car) => [car.id, car]));
 const careerIds = Object.keys(careerEvents) as CareerEventId[];
+const fullCaseCycle = 8_000;
+const skipCaseCycle = 4_000;
 const profiles = [
-  { id: 'Junkyard', duration: 24_000, strategy: 'yard' },
+  { id: 'Junkyard (full opening)', duration: 24_000, strategy: 'yard' },
+  { id: 'Junkyard (Skip)', duration: 7_000, strategy: 'yard' },
   { id: 'Career', duration: 24_000, strategy: 'career' },
   { id: 'Frequent losses', duration: 24_000, strategy: 'losses' },
   { id: 'Sell all duplicates', duration: 24_000, strategy: 'duplicates' },
@@ -126,6 +129,7 @@ function upgrade(state: GameState, matchups: Map<string, Matchup>, purchases: Re
 function runSession(profile: Profile, seed: number, matchups: Map<string, Matchup>) {
   const random = createRandom(seed);
   const nextSeed = () => Math.floor(random() * 0x100000000);
+  const caseDuration = profile.duration === 7_000 ? skipCaseCycle : fullCaseCycle;
   let state = createGame();
   let now = epoch;
   let earned = 0;
@@ -146,11 +150,11 @@ function runSession(profile: Profile, seed: number, matchups: Map<string, Matchu
     }
     if (state.career.completed.length === careerIds.length) careerCompleted ??= now - epoch;
     if (state.coins >= alternativeHyperPrice) alternativeHyper ??= now - epoch;
-    const caseWait = junkyardRemainingMs(state, now);
-    const junkyard = caseWait === 0;
-    const paid = profile.strategy === 'yard' || profile.strategy === 'losses' ? undefined : upgrade(state, matchups, purchases);
-    const chosen = junkyard && (!state.garage.length || profile.strategy !== 'farm') ? 'junkyard' : paid;
+    const chosen = !state.garage.length || profile.strategy === 'yard'
+      ? 'junkyard'
+      : profile.strategy !== 'losses' ? upgrade(state, matchups, purchases) : undefined;
     if (chosen) {
+      recordCheckpoints(now + caseDuration);
       const opened = openCase(state, chosen, nextSeed(), now);
       const car = opened.garage.at(-1)!;
       const duplicate = state.garage.some((owned) => owned.carId === car.carId);
@@ -158,11 +162,12 @@ function runSession(profile: Profile, seed: number, matchups: Map<string, Matchu
       state = finishCase(opened, sell ? 'sell' : 'keep');
       if (sell) earned += state.coins - opened.coins;
       if (chosen !== 'junkyard') purchases.set(chosen, (purchases.get(chosen) ?? 0) + 1);
-      now += profile.duration === 7_000 ? 4_000 : 8_000;
+      now += caseDuration;
       continue;
     }
-    const entry = profile.strategy === 'yard' ? undefined : bestEntry(state, now, matchups, profile);
+    const entry = bestEntry(state, now, matchups, profile);
     if (entry) {
+      recordCheckpoints(now + profile.duration);
       if (entry.owned.id !== state.selectedId) state = selectCar(state, entry.owned.id);
       const started = entry.event
         ? startCareerRace(state, entry.event, entry.tactic, nextSeed(), now)
@@ -174,9 +179,7 @@ function runSession(profile: Profile, seed: number, matchups: Map<string, Matchu
       now += profile.duration;
       continue;
     }
-    const raceWait = profile.strategy === 'yard' ? 0 : raceRewardPreview(state, undefined, now).remainingMs;
-    const nextSlot = [caseWait, raceWait].filter((delay) => delay > 0);
-    now += nextSlot.length ? Math.min(...nextSlot) : 1_000;
+    now += raceRewardPreview(state, undefined, now).remainingMs || 1_000;
   }
   recordCheckpoints(Number.POSITIVE_INFINITY);
   return { balances, firstAffordable, careerCompleted, alternativeHyper, wins: won, races: state.progress.racesCompleted };
@@ -232,8 +235,16 @@ export function simulateEconomy() {
     lines.push(`| ${profile.id} | ${career} | ${hyper} |`);
   }
   lines.push('', 'Times are means among sessions reaching the goal by 180 minutes. The percentage is coverage. Income excludes the initial wallet and does not subtract case purchases.',
+    'Junkyard-only strategies keep the first car and sell every later drop. Other strategies open their starter, then prioritize racing and their configured paid case purchases.',
     '', '| Case | Price | Expected resale |', '| --- | ---: | ---: |');
   for (const id of caseIds) lines.push(`| ${cases[id].name} | ${cases[id].price} | ${expectedResale(id).toFixed(2)} |`);
-  lines.push(`First Junkyard theoretical resale: ${expectedResale('junkyard', true).toFixed(2)} coins (the last-car protection prevents selling it immediately).`);
+  lines.push('', '| Junkyard cycle | Expected coins at 10 min | 30 min | 60 min |',
+    '| --- | ---: | ---: | ---: |');
+  const resale = expectedResale('junkyard');
+  for (const [label, duration] of [['Full opening', fullCaseCycle], ['Skip', skipCaseCycle]] as const) {
+    const earnings = checkpoints.map((time) => ((Math.floor(time / duration) - 1) * resale).toFixed(2));
+    lines.push(`| ${label} (${duration / 1_000}s) | ${earnings.join(' | ')} |`);
+  }
+  lines.push('', `First Junkyard theoretical resale: ${expectedResale('junkyard', true).toFixed(2)} coins (the last-car protection prevents selling it immediately).`);
   return lines.join('\n');
 }

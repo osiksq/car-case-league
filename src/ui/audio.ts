@@ -39,7 +39,7 @@ type Sample = readonly [file: string, level: number];
 
 const effectsBank: Record<SoundName, Sample> = {
   button: ['ui-button', .48],
-  'case-select': ['case-select', .63],
+  'case-select': ['case-select', .55],
   'car-select': ['ui-car-select', .61],
   coins: ['ui-coins', .73],
   sale: ['ui-sale', .78],
@@ -48,12 +48,13 @@ const effectsBank: Record<SoundName, Sample> = {
   defeat: ['defeat', .70],
 };
 const rewards: Record<Rarity, Sample> = {
-  Common: ['reward-common', .70],
-  Uncommon: ['reward-uncommon', .72],
-  Rare: ['reward-rare', .75],
-  Epic: ['reward-epic', .78],
-  Legendary: ['reward-legendary', .91],
-  Mythic: ['reward-mythic', .95],
+  Common: ['reward-common', .75],
+  Uncommon: ['reward-uncommon', .75],
+  Rare: ['reward-rare', .76],
+  Epic: ['reward-epic', .77],
+  Legendary: ['reward-legendary', .77],
+  Mythic: ['reward-mythic', .77],
+  Exotic: ['reward-exotic', .76],
 };
 const raceSamples = {
   countdown: ['countdown', .60],
@@ -65,10 +66,11 @@ const raceSamples = {
   finish: ['finish', .79],
 } satisfies Record<string, Sample>;
 const caseSamples = {
-  open: ['case-open', .73],
-  latch: ['case-latch', .69],
+  open: ['case-open', .75],
+  latch: ['case-latch', .49],
+  rise: ['reel-rise', .62],
   tick: ['reel-tick', .51],
-  settle: ['reel-stop', .86],
+  settle: ['reel-stop', .77],
 } satisfies Record<string, Sample>;
 
 interface AudioGraph {
@@ -295,25 +297,36 @@ class GameAudio {
   }
 
   reel(): { cue(event: ReelCue): void; stop(): void } {
-    const scope: Scope = { active: true };
+    const motion: Scope = { active: true };
+    const landing: Scope = { active: true };
     let lastTick = -Infinity;
+    let riseGeneration = -1;
     this.warm([...Object.values(caseSamples), ...Object.values(rewards)]);
-    this.sample(scope, caseSamples.open);
+    this.sample(motion, caseSamples.open);
     return {
       cue: (event) => {
-        if (!scope.active) return;
-        if (event === 'mechanism') this.sample(scope, caseSamples.latch, .07);
-        if (event === 'settle') this.sample(scope, caseSamples.settle);
-        if (event === 'tick') {
+        if (!motion.active) return;
+        if (event === 'settle') {
+          motion.active = false;
+          this.stopVoices(motion);
+          this.sample(landing, caseSamples.settle);
+        } else if (event === 'mechanism') {
+          this.sample(motion, caseSamples.latch, .07);
+        } else if (event === 'tick') {
           const now = this.activeGraph()?.context.currentTime;
           if (now === undefined || now - lastTick < .061) return;
           lastTick = now;
-          this.sample(scope, caseSamples.tick, 0, .10);
+          this.sample(motion, caseSamples.tick, 0, .10);
+        } else if (riseGeneration !== this.effectsGeneration && this.activeGraph() && this.settings.effects > 0) {
+          riseGeneration = this.effectsGeneration;
+          this.sample(motion, caseSamples.rise, 0, 3.8, event.elapsed / 1_000);
         }
       },
       stop: () => {
-        scope.active = false;
-        this.stopVoices(scope);
+        motion.active = false;
+        landing.active = false;
+        this.stopVoices(motion);
+        this.stopVoices(landing);
       },
     };
   }
@@ -347,7 +360,7 @@ class GameAudio {
     }
   }
 
-  private sample(scope: Scope, [file, level]: Sample, delay = 0, tolerance = .28): void {
+  private sample(scope: Scope, [file, level]: Sample, delay = 0, tolerance = .28, offset?: number): void {
     const graph = this.activeGraph();
     if (!graph || !scope.active || this.settings.effects === 0) return;
     const generation = this.effectsGeneration;
@@ -357,6 +370,8 @@ class GameAudio {
       if (!buffer || !scope.active || this.activeGraph() !== graph || generation !== this.effectsGeneration) return;
       const { context, effects } = graph;
       if (context.currentTime - when > tolerance) return;
+      const startOffset = offset === undefined ? 0 : offset + Math.max(0, context.currentTime - when);
+      if (startOffset >= buffer.duration) return;
       const source = context.createBufferSource();
       const gain = context.createGain();
       source.buffer = buffer;
@@ -376,7 +391,7 @@ class GameAudio {
       source.onended = cleanup;
       if (this.voices.size >= this.voiceLimit) this.voices.values().next().value?.stop();
       this.voices.add(voice);
-      source.start(Math.max(when, context.currentTime));
+      source.start(Math.max(when, context.currentTime), startOffset);
     };
     if (resource instanceof Promise) void resource.then(play);
     else play(resource);
