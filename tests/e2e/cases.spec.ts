@@ -25,11 +25,7 @@ test('the collection displays all eight models in price order and opens their de
     else await expect(action).toBeDisabled();
 
     const odds = page.getByRole('region', { name: 'Drop odds' }).getByRole('listitem');
-    await expect(odds).toHaveCount(rarities.length);
-    for (const tier of rarities) {
-      const row = odds.filter({ has: page.getByText(tier, { exact: true }) });
-      await expect(row.getByText(`${entry.odds[tier]}%`, { exact: true })).toBeVisible();
-    }
+    await expect(odds).toHaveText(rarities.map((tier) => new RegExp(`^${tier} *${entry.odds[tier]}%$`)));
     if (!await pool.evaluate((element: HTMLDetailsElement) => element.open)) {
       await pool.locator('summary').click();
     }
